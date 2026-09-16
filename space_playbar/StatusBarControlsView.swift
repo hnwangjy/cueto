@@ -30,7 +30,7 @@ struct StatusBarControlsView: View {
                 Button("打开 \(playback.applicationName)", action: playback.openSourceApplication)
                 Divider()
             }
-            Button("退出 Space Playbar", action: onQuit)
+            Button("退出 NowKeys", action: onQuit)
         }
         .animation(.easeOut(duration: 0.14), value: playback.isPlaying)
         .animation(.easeOut(duration: 0.14), value: playback.applicationName)

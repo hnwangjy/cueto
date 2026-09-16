@@ -19,7 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         button.image = nil
         button.title = ""
         button.action = nil
-        button.toolTip = "Space Playbar"
+        button.toolTip = "NowKeys"
 
         let rootView = StatusBarControlsView(
             playback: playback,
