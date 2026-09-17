@@ -1,8 +1,8 @@
-# NowKeys
+# Cueto
 
-NowKeys 是一个轻量的 macOS 菜单栏媒体控制器。无需切换窗口，就能控制当前正在播放声音的应用。
+Cueto 是一个轻量的 macOS 菜单栏媒体控制器。它把播放指令准确交给当前正在发声的应用，让你无需切换窗口就能控制小宇宙、浏览器、音乐或播客。
 
-![NowKeys App Icon](space_playbar/Assets.xcassets/AppIcon.appiconset/NowKeys-256.png)
+![Cueto App Icon](space_playbar/Assets.xcassets/AppIcon.appiconset/Cueto-256.png)
 
 ## 能做什么
 
@@ -14,17 +14,17 @@ NowKeys 是一个轻量的 macOS 菜单栏媒体控制器。无需切换窗口�
 
 ## 安装
 
-1. 从 [Releases](https://github.com/hnwangjy/nowkeys/releases) 下载最新的 DMG。
-2. 打开 DMG，将 **NowKeys** 拖入“应用程序”。
-3. 启动 NowKeys，控制条会出现在菜单栏。
+1. 从 [Releases](https://github.com/hnwangjy/cueto/releases) 下载最新的 DMG。
+2. 打开 DMG，将 **Cueto** 拖入“应用程序”。
+3. 启动 Cueto，控制条会出现在菜单栏。
 
-> 当前构建已使用 Developer ID 签名，但尚未经过 Apple 公证。首次启动时如果 macOS 阻止打开，请在 Finder 中右键 NowKeys，选择“打开”。
+> 当前构建已使用 Developer ID 签名，但尚未经过 Apple 公证。首次启动时如果 macOS 阻止打开，请在 Finder 中右键 Cueto，选择“打开”。
 
 ## 使用方式
 
-开始播放任意受支持应用中的内容，NowKeys 会自动显示当前来源。左侧点击应用名称可以查看播放信息；右侧三个按钮分别用于后退、播放/暂停和前进。
+开始播放任意受支持应用中的内容，Cueto 会自动显示当前来源。左侧点击应用名称可以查看播放信息；右侧三个按钮分别用于后退、播放/暂停和前进。
 
-NowKeys 调用 macOS 的系统 Now Playing / MediaRemote 能力，不会模拟鼠标点击，也不会为了控制播放而跳转到来源应用。
+Cueto 调用 macOS 的系统 Now Playing / MediaRemote 能力，不会模拟鼠标点击，也不会为了控制播放而跳转到来源应用。
 
 ## 系统要求
 
@@ -37,4 +37,4 @@ NowKeys 调用 macOS 的系统 Now Playing / MediaRemote 能力，不会模拟�
 
 ## 说明
 
-NowKeys 依赖 macOS 的非公开 MediaRemote 接口，因此更适合作为个人工具和开源实验项目；系统升级后相关行为可能发生变化。
+Cueto 依赖 macOS 的非公开 MediaRemote 接口，因此更适合作为个人工具和开源实验项目；系统升级后相关行为可能发生变化。

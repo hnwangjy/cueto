@@ -1,15 +1,15 @@
 {
   "images" : [
-    { "filename" : "NowKeys-16.png", "idiom" : "mac", "scale" : "1x", "size" : "16x16" },
-    { "filename" : "NowKeys-16@2x.png", "idiom" : "mac", "scale" : "2x", "size" : "16x16" },
-    { "filename" : "NowKeys-32.png", "idiom" : "mac", "scale" : "1x", "size" : "32x32" },
-    { "filename" : "NowKeys-32@2x.png", "idiom" : "mac", "scale" : "2x", "size" : "32x32" },
-    { "filename" : "NowKeys-128.png", "idiom" : "mac", "scale" : "1x", "size" : "128x128" },
-    { "filename" : "NowKeys-128@2x.png", "idiom" : "mac", "scale" : "2x", "size" : "128x128" },
-    { "filename" : "NowKeys-256.png", "idiom" : "mac", "scale" : "1x", "size" : "256x256" },
-    { "filename" : "NowKeys-256@2x.png", "idiom" : "mac", "scale" : "2x", "size" : "256x256" },
-    { "filename" : "NowKeys-512.png", "idiom" : "mac", "scale" : "1x", "size" : "512x512" },
-    { "filename" : "NowKeys-1024.png", "idiom" : "mac", "scale" : "2x", "size" : "512x512" }
+    { "filename" : "Cueto-16.png", "idiom" : "mac", "scale" : "1x", "size" : "16x16" },
+    { "filename" : "Cueto-16@2x.png", "idiom" : "mac", "scale" : "2x", "size" : "16x16" },
+    { "filename" : "Cueto-32.png", "idiom" : "mac", "scale" : "1x", "size" : "32x32" },
+    { "filename" : "Cueto-32@2x.png", "idiom" : "mac", "scale" : "2x", "size" : "32x32" },
+    { "filename" : "Cueto-128.png", "idiom" : "mac", "scale" : "1x", "size" : "128x128" },
+    { "filename" : "Cueto-128@2x.png", "idiom" : "mac", "scale" : "2x", "size" : "128x128" },
+    { "filename" : "Cueto-256.png", "idiom" : "mac", "scale" : "1x", "size" : "256x256" },
+    { "filename" : "Cueto-256@2x.png", "idiom" : "mac", "scale" : "2x", "size" : "256x256" },
+    { "filename" : "Cueto-512.png", "idiom" : "mac", "scale" : "1x", "size" : "512x512" },
+    { "filename" : "Cueto-1024.png", "idiom" : "mac", "scale" : "2x", "size" : "512x512" }
   ],
   "info" : {
     "author" : "xcode",
