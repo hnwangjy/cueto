@@ -10,6 +10,7 @@ final class StatusBarControlView: NSView {
     private let onQuit: () -> Void
     private var observations = Set<AnyCancellable>()
     private var popover: NSPopover?
+    private let separator = NSBox()
 
     private lazy var sourceButton = makeButton(action: #selector(showNowPlaying))
     private lazy var backwardButton = makeSymbolButton(
@@ -42,6 +43,7 @@ final class StatusBarControlView: NSView {
         refreshSource()
         refreshPlaybackState()
         refreshAvailability()
+        refreshAppearance()
     }
 
     @available(*, unavailable)
@@ -51,6 +53,20 @@ final class StatusBarControlView: NSView {
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
         true
+    }
+
+    override var allowsVibrancy: Bool {
+        true
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        refreshAppearance()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refreshAppearance()
     }
 
     override func rightMouseDown(with event: NSEvent) {
@@ -63,7 +79,6 @@ final class StatusBarControlView: NSView {
     }
 
     private func setupView() {
-        let separator = NSBox()
         separator.boxType = .separator
         separator.translatesAutoresizingMaskIntoConstraints = false
 
@@ -73,7 +88,6 @@ final class StatusBarControlView: NSView {
         sourceButton.alignment = .center
         sourceButton.toolTip = "查看当前播放来源"
         sourceButton.setAccessibilityLabel("当前播放来源")
-        sourceButton.contentTintColor = .labelColor
         sourceButton.setContentHuggingPriority(.defaultLow, for: .horizontal)
         sourceButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
@@ -125,7 +139,6 @@ final class StatusBarControlView: NSView {
         button.imageScaling = .scaleProportionallyDown
         button.toolTip = label
         button.setAccessibilityLabel(label)
-        button.contentTintColor = .labelColor
         return button
     }
 
@@ -156,7 +169,6 @@ final class StatusBarControlView: NSView {
     }
 
     private func refreshSource() {
-        sourceButton.title = "\(playback.applicationName) ⌄"
         if let icon = playback.applicationIcon {
             let image = icon.copy() as? NSImage
             image?.size = NSSize(width: 15, height: 15)
@@ -167,6 +179,7 @@ final class StatusBarControlView: NSView {
                 accessibilityDescription: "播放来源"
             )?.withSymbolConfiguration(.init(pointSize: 12, weight: .semibold))
         }
+        refreshAppearance()
     }
 
     private func refreshPlaybackState() {
@@ -178,6 +191,25 @@ final class StatusBarControlView: NSView {
         )?.withSymbolConfiguration(.init(pointSize: 13, weight: .semibold))
         playPauseButton.toolTip = label
         playPauseButton.setAccessibilityLabel(label)
+        refreshAppearance()
+    }
+
+    private func refreshAppearance() {
+        let foregroundColor = NSColor.white
+        let separatorColor = NSColor.white.withAlphaComponent(0.32)
+
+        sourceButton.attributedTitle = NSAttributedString(
+            string: "\(playback.applicationName) ⌄",
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 12, weight: .semibold),
+                .foregroundColor: foregroundColor
+            ]
+        )
+        [sourceButton, backwardButton, playPauseButton, forwardButton].forEach {
+            $0.contentTintColor = foregroundColor
+        }
+        separator.fillColor = separatorColor
+        needsDisplay = true
     }
 
     private func refreshTransportControls() {
