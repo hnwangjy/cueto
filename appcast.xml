@@ -3,6 +3,34 @@
     <channel>
         <title>Cueto</title>
         <item>
+            <title>1.0.4</title>
+            <pubDate>Fri, 18 Sep 2026 13:23:14 +0800</pubDate>
+            <link>https://github.com/hnwangjy/cueto</link>
+            <sparkle:version>5</sparkle:version>
+            <sparkle:shortVersionString>1.0.4</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.7</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Cueto 1.0.4
+
+## 新功能
+
+- **播放进度一目了然**：点击当前播放来源后，可以查看实时进度条、已播放时间、总时长和剩余时间。
+
+## 修复
+
+- **恢复小宇宙的前进与后退控制**：改用精确播放位置跳转，后退 15 秒和前进 30 秒现在可以正常生效。
+
+## 安装说明
+
+此版本已使用 Developer ID 签名，但尚未经过 Apple 公证。首次启动时如果 macOS 阻止打开，请在 Finder 中右键 Cueto 并选择“打开”。
+
+SHA-256：`24e747c793eb2c05790011cb89076a1b605109a0035e92481e8891480d7185e5`
+]]></description>
+            <enclosure url="https://github.com/hnwangjy/cueto/releases/download/v1.0.4/Cueto-1.0.4.dmg" length="3634797" type="application/octet-stream" sparkle:edSignature="DbUgyKpiD01kQ+VATJfd5HWvJUH3geNroDMd00IdPzBBDDhxICOlSwoTFZyEJGmda+2LqdrY0IvtYXkByWXZBA=="/>
+            <sparkle:deltas>
+                <enclosure url="https://github.com/hnwangjy/cueto/releases/download/v1.0.4/Cueto5-4.delta" sparkle:deltaFrom="4" length="56162" type="application/octet-stream" sparkle:deltaFromSparkleExecutableSize="976432" sparkle:deltaFromSparkleLocales="de,he,ar,el,ja,fa,uk" sparkle:edSignature="A/0Dw5pTLVCU2tJ8vUrOafpveWnaYuqqgVjicCKwU5oLqI2CDmYfOoBofIJ8T5KGlnZxAQnZZtzrAhQBH9RiAA=="/>
+            </sparkle:deltas>
+        </item>
+        <item>
             <title>1.0.3</title>
             <pubDate>Fri, 18 Sep 2026 09:02:37 +0800</pubDate>
             <link>https://github.com/hnwangjy/cueto</link>
