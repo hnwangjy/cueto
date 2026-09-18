@@ -288,7 +288,7 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = Cueto;
+				INFOPLIST_KEY_CFBundleDisplayName = "Cueto Dev";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -305,8 +305,8 @@
 					"$(inherited)",
 				);
 				MARKETING_VERSION = 1.0.3;
-				PRODUCT_BUNDLE_IDENTIFIER = com.wangjiayuan.cueto;
-				PRODUCT_NAME = Cueto;
+				PRODUCT_BUNDLE_IDENTIFIER = com.wangjiayuan.cueto.dev;
+				PRODUCT_NAME = "Cueto Dev";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
