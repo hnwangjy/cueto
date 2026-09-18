@@ -12,8 +12,14 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var isPlaying = false
     @Published private(set) var hasActiveSession = false
     @Published private(set) var applicationIcon: NSImage?
+    @Published private(set) var elapsedTime: TimeInterval?
+    @Published private(set) var duration: TimeInterval?
 
     private let media = MediaController()
+    private var progressTimer: AnyCancellable?
+    private var referenceElapsedTime: TimeInterval?
+    private var referenceDate = Date()
+    private var playbackRate = 0.0
     private var pendingPlaybackState: Bool?
     private var pendingStateDeadline = Date.distantPast
     private var pendingStateToken = UUID()
@@ -29,6 +35,11 @@ final class PlaybackController: ObservableObject {
         media.getTrackInfo { [weak self] info in
             self?.receive(info)
         }
+        progressTimer = Timer.publish(every: 0.5, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                self?.refreshDisplayedProgress()
+            }
     }
 
     func playPause() {
@@ -58,15 +69,42 @@ final class PlaybackController: ObservableObject {
 
     func skipBackward() {
         guard hasActiveSession else { return }
-        media.goBackFifteenSeconds()
+        seek(by: -15)
     }
 
     func skipForward() {
         guard hasActiveSession else { return }
-        media.skipFifteenSeconds()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
-            self?.media.skipFifteenSeconds()
+        seek(by: 30)
+    }
+
+    private func seek(by offset: TimeInterval) {
+        guard let currentTime = currentElapsedTime else { return }
+        let upperBound = duration ?? .greatestFiniteMagnitude
+        let targetTime = min(max(currentTime + offset, 0), upperBound)
+
+        media.setTime(seconds: targetTime)
+        referenceElapsedTime = targetTime
+        referenceDate = Date()
+        elapsedTime = targetTime
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            self?.media.getTrackInfo { [weak self] info in
+                self?.receive(info)
+            }
         }
+    }
+
+    private var currentElapsedTime: TimeInterval? {
+        guard let referenceElapsedTime else { return nil }
+        let advancedTime = isPlaying
+            ? Date().timeIntervalSince(referenceDate) * playbackRate
+            : 0
+        let upperBound = duration ?? .greatestFiniteMagnitude
+        return min(max(referenceElapsedTime + advancedTime, 0), upperBound)
+    }
+
+    private func refreshDisplayedProgress() {
+        elapsedTime = currentElapsedTime
     }
 
     private func receive(_ info: TrackInfo?) {
@@ -81,6 +119,10 @@ final class PlaybackController: ObservableObject {
             isPlaying = false
             hasActiveSession = false
             applicationIcon = nil
+            elapsedTime = nil
+            duration = nil
+            referenceElapsedTime = nil
+            playbackRate = 0
             return
         }
 
@@ -99,6 +141,11 @@ final class PlaybackController: ObservableObject {
         }
         hasActiveSession = true
         applicationIcon = icon(for: payload.bundleIdentifier)
+        duration = payload.durationMicros.map { $0 / 1_000_000 }
+        referenceElapsedTime = payload.currentElapsedTime ?? payload.elapsedTimeMicros.map { $0 / 1_000_000 }
+        referenceDate = Date()
+        playbackRate = reportedPlaying ? (payload.playbackRate ?? 1) : 0
+        refreshDisplayedProgress()
     }
 
     private func sourceName(for bundleIdentifier: String?) -> String {
