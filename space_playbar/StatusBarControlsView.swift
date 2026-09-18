@@ -3,33 +3,32 @@ import SwiftUI
 
 struct StatusBarControlsView: View {
     @ObservedObject var playback: PlaybackController
+    let onOpenCueto: () -> Void
     let onQuit: () -> Void
     @State private var isInfoPresented = false
 
     var body: some View {
-        HStack(spacing: 3) {
+        HStack(spacing: 1) {
             sourceButton
 
             Divider()
                 .frame(height: 14)
-                .padding(.horizontal, 2)
+                .padding(.horizontal, 1)
 
-            controlButton("gobackward.15", label: "后退 15 秒", action: playback.skipBackward)
+            controlButton("backward.end", label: "后退 15 秒", action: playback.skipBackward)
             controlButton(
                 playback.isPlaying ? "pause.fill" : "play.fill",
                 label: playback.isPlaying ? "暂停" : "播放",
                 action: playback.playPause
             )
-            controlButton("goforward.30", label: "前进 30 秒", action: playback.skipForward)
+            controlButton("forward.end", label: "前进 30 秒", action: playback.skipForward)
         }
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 3)
         .frame(maxHeight: .infinity)
         .opacity(playback.hasActiveSession ? 1 : 0.62)
         .contextMenu {
-            if playback.hasActiveSession {
-                Button("打开 \(playback.applicationName)", action: playback.openSourceApplication)
-                Divider()
-            }
+            Button("打开 Cueto", action: onOpenCueto)
+            Divider()
             Button("退出 Cueto", action: onQuit)
         }
         .animation(.easeOut(duration: 0.14), value: playback.isPlaying)
@@ -55,7 +54,11 @@ struct StatusBarControlsView: View {
         .help("查看当前播放来源")
         .disabled(!playback.hasActiveSession)
         .popover(isPresented: $isInfoPresented, arrowEdge: .bottom) {
-            NowPlayingPopover(playback: playback, onQuit: onQuit)
+            NowPlayingPopover(
+                playback: playback,
+                onOpenCueto: onOpenCueto,
+                onQuit: onQuit
+            )
         }
     }
 
@@ -78,7 +81,7 @@ struct StatusBarControlsView: View {
             Image(systemName: symbol)
                 .contentTransition(.symbolEffect(.replace))
                 .font(.system(size: 13, weight: .semibold))
-                .frame(width: 27, height: 20)
+                .frame(width: 23, height: 20)
                 .contentShape(Rectangle())
         }
         .buttonStyle(StatusBarButtonStyle(horizontalPadding: 0))
@@ -90,7 +93,9 @@ struct StatusBarControlsView: View {
 
 private struct NowPlayingPopover: View {
     @ObservedObject var playback: PlaybackController
+    let onOpenCueto: () -> Void
     let onQuit: () -> Void
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -129,7 +134,12 @@ private struct NowPlayingPopover: View {
             Divider()
 
             HStack {
-                Button("打开应用", action: playback.openSourceApplication)
+                Button("打开 Cueto") {
+                    dismiss()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        onOpenCueto()
+                    }
+                }
                 Spacer()
                 Button("退出", action: onQuit)
                     .foregroundStyle(.secondary)

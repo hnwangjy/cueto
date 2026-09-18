@@ -69,14 +69,6 @@ final class PlaybackController: ObservableObject {
         }
     }
 
-    func openSourceApplication() {
-        guard let bundleIdentifier,
-              let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
-            return
-        }
-        NSWorkspace.shared.openApplication(at: url, configuration: .init())
-    }
-
     private func receive(_ info: TrackInfo?) {
         guard let payload = info?.payload else {
             if pendingPlaybackState != nil, Date() < pendingStateDeadline {

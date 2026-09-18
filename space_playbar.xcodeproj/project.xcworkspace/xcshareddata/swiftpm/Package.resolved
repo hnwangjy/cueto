@@ -1,5 +1,5 @@
 {
-  "originHash" : "e2bc9a25486db2f7c3daa93c7abf2a3035f1d3242958d2405517498ee6b880fc",
+  "originHash" : "fb7d7647cfdcdb6cfe48112103992efcd6711d21d21b2b2e8cc7db44f3001b5d",
   "pins" : [
     {
       "identity" : "mediaremote-adapter",
@@ -7,6 +7,15 @@
       "location" : "https://github.com/ejbills/mediaremote-adapter.git",
       "state" : {
         "revision" : "5b6afde3f501a3da567e23bf7f23d562938a1809"
+      }
+    },
+    {
+      "identity" : "sparkle",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sparkle-project/Sparkle",
+      "state" : {
+        "revision" : "eef1a539a373c1f1a320624b1130fc5de7b2e100",
+        "version" : "2.10.0"
       }
     }
   ],
