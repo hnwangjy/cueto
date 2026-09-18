@@ -3,6 +3,33 @@
     <channel>
         <title>Cueto</title>
         <item>
+            <title>1.0.6</title>
+            <pubDate>Fri, 18 Sep 2026 18:41:04 +0800</pubDate>
+            <link>https://github.com/hnwangjy/cueto</link>
+            <sparkle:version>7</sparkle:version>
+            <sparkle:shortVersionString>1.0.6</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.7</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Cueto 1.0.6
+
+## 改进
+
+- **菜单栏内容更清晰**：应用名称和播放按钮现在使用高对比度显示，在深色菜单栏上更容易辨认。
+- **交互反馈更明确**：优化来源按钮和播放控制按钮的按压、选中背景，打开播放面板时可以清楚看到当前选中来源。
+- **来源名称显示更完整**：重新分配菜单栏空间，减少应用名称被过早截断的问题。
+
+## 修复
+
+- 修复播放信息面板打开后仍显示为非激活灰色状态的问题，现在会立即使用系统强调色。
+
+## 安装说明
+
+此版本已使用 Developer ID 签名，但尚未经过 Apple 公证。首次启动时如果 macOS 阻止打开，请在 Finder 中右键 Cueto 并选择“打开”。
+
+SHA-256：`e92e2344fcdaf9ccd13c93f477f5015e4e92d62d9986a390c94f45bec331602d`
+]]></description>
+            <enclosure url="https://github.com/hnwangjy/cueto/releases/download/v1.0.6/Cueto-1.0.6.dmg" length="3837502" type="application/octet-stream" sparkle:edSignature="UFGpffBWeF+lG4S+dF6P+byhRl+NL4Yhwc7kBbHdttF61vayYIkW8CLf7cBRDd+fYbu93bRhtM/SjnsAZ0PaDg=="/>
+        </item>
+        <item>
             <title>1.0.5</title>
             <pubDate>Fri, 18 Sep 2026 16:09:53 +0800</pubDate>
             <link>https://github.com/hnwangjy/cueto</link>
