@@ -3,6 +3,28 @@
     <channel>
         <title>Cueto</title>
         <item>
+            <title>1.0.5</title>
+            <pubDate>Fri, 18 Sep 2026 16:09:53 +0800</pubDate>
+            <link>https://github.com/hnwangjy/cueto</link>
+            <sparkle:version>6</sparkle:version>
+            <sparkle:shortVersionString>1.0.5</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.7</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Cueto 1.0.5
+
+## 改进
+
+- **更可靠的菜单栏控制**：重做菜单栏按钮的点击处理，改善在新版 macOS 上反复点击却没有响应的问题。
+- **控制行为与播放器一致**：音乐类播放器现在使用上一首和下一首；小宇宙与播客应用继续使用后退 15 秒和前进 30 秒。
+
+## 安装说明
+
+此版本已使用 Developer ID 签名，但尚未经过 Apple 公证。首次启动时如果 macOS 阻止打开，请在 Finder 中右键 Cueto 并选择“打开”。
+
+SHA-256：`b1f191219253bb1cea2625546191c0514274c3cee2cf4427f3f077fd6f813e47`
+]]></description>
+            <enclosure url="https://github.com/hnwangjy/cueto/releases/download/v1.0.5/Cueto-1.0.5.dmg" length="3858627" type="application/octet-stream" sparkle:edSignature="CnvuHkqSeWjVHfMfIywjRu+obDp93Mb+T9WXOrcpQYNoIeQ1OiKJ0bVdqmsEgIKE5PS1RticTgtespRYxG3WDQ=="/>
+        </item>
+        <item>
             <title>1.0.4</title>
             <pubDate>Fri, 18 Sep 2026 13:23:14 +0800</pubDate>
             <link>https://github.com/hnwangjy/cueto</link>

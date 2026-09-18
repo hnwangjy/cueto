@@ -1,97 +1,7 @@
 #if os(macOS)
 import SwiftUI
 
-struct StatusBarControlsView: View {
-    @ObservedObject var playback: PlaybackController
-    let onOpenCueto: () -> Void
-    let onQuit: () -> Void
-    @State private var isInfoPresented = false
-
-    var body: some View {
-        HStack(spacing: 1) {
-            sourceButton
-
-            Divider()
-                .frame(height: 14)
-                .padding(.horizontal, 1)
-
-            controlButton("backward.end", label: "后退 15 秒", action: playback.skipBackward)
-            controlButton(
-                playback.isPlaying ? "pause.fill" : "play.fill",
-                label: playback.isPlaying ? "暂停" : "播放",
-                action: playback.playPause
-            )
-            controlButton("forward.end", label: "前进 30 秒", action: playback.skipForward)
-        }
-        .padding(.horizontal, 3)
-        .frame(maxHeight: .infinity)
-        .opacity(playback.hasActiveSession ? 1 : 0.62)
-        .contextMenu {
-            Button("打开 Cueto", action: onOpenCueto)
-            Divider()
-            Button("退出 Cueto", action: onQuit)
-        }
-        .animation(.easeOut(duration: 0.14), value: playback.isPlaying)
-        .animation(.easeOut(duration: 0.14), value: playback.applicationName)
-    }
-
-    private var sourceButton: some View {
-        Button { isInfoPresented.toggle() } label: {
-            HStack(spacing: 6) {
-                sourceIcon
-                Text(playback.applicationName)
-                    .font(.system(size: 12, weight: .semibold))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 7, weight: .bold))
-                    .foregroundStyle(.secondary)
-            }
-            .fixedSize(horizontal: true, vertical: false)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(StatusBarButtonStyle(horizontalPadding: 5))
-        .help("查看当前播放来源")
-        .disabled(!playback.hasActiveSession)
-        .popover(isPresented: $isInfoPresented, arrowEdge: .bottom) {
-            NowPlayingPopover(
-                playback: playback,
-                onOpenCueto: onOpenCueto,
-                onQuit: onQuit
-            )
-        }
-    }
-
-    @ViewBuilder
-    private var sourceIcon: some View {
-        if let icon = playback.applicationIcon {
-            Image(nsImage: icon)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 15, height: 15)
-        } else {
-            Image(systemName: "waveform")
-                .font(.system(size: 12, weight: .semibold))
-                .frame(width: 15)
-        }
-    }
-
-    private func controlButton(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .contentTransition(.symbolEffect(.replace))
-                .font(.system(size: 13, weight: .semibold))
-                .frame(width: 23, height: 20)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(StatusBarButtonStyle(horizontalPadding: 0))
-        .help(label)
-        .disabled(!playback.hasActiveSession)
-        .accessibilityLabel(label)
-    }
-}
-
-private struct NowPlayingPopover: View {
+struct NowPlayingPopover: View {
     @ObservedObject var playback: PlaybackController
     let onOpenCueto: () -> Void
     let onQuit: () -> Void
@@ -193,22 +103,6 @@ private struct NowPlayingPopover: View {
             return String(format: "%d:%02d:%02d", hours, minutes, seconds)
         }
         return String(format: "%d:%02d", minutes, seconds)
-    }
-}
-
-private struct StatusBarButtonStyle: ButtonStyle {
-    let horizontalPadding: CGFloat
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .padding(.horizontal, horizontalPadding)
-            .foregroundStyle(.primary)
-            .background(
-                RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .fill(configuration.isPressed ? Color.primary.opacity(0.13) : .clear)
-            )
-            .scaleEffect(configuration.isPressed ? 0.96 : 1)
-            .animation(.easeOut(duration: 0.08), value: configuration.isPressed)
     }
 }
 #endif

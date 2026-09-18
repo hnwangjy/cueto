@@ -5,6 +5,11 @@ import MediaRemoteAdapter
 
 @MainActor
 final class PlaybackController: ObservableObject {
+    enum TransportMode {
+        case timeSkipping
+        case trackNavigation
+    }
+
     @Published private(set) var applicationName = "未在播放"
     @Published private(set) var bundleIdentifier: String?
     @Published private(set) var title: String?
@@ -23,6 +28,28 @@ final class PlaybackController: ObservableObject {
     private var pendingPlaybackState: Bool?
     private var pendingStateDeadline = Date.distantPast
     private var pendingStateToken = UUID()
+
+    var transportMode: TransportMode {
+        guard let bundleIdentifier = bundleIdentifier?.lowercased() else {
+            return .trackNavigation
+        }
+        return Self.timeSkippingBundleIdentifiers.contains(bundleIdentifier)
+            ? .timeSkipping
+            : .trackNavigation
+    }
+
+    var backwardControlLabel: String {
+        transportMode == .timeSkipping ? "后退 15 秒" : "上一首"
+    }
+
+    var forwardControlLabel: String {
+        transportMode == .timeSkipping ? "前进 30 秒" : "下一首"
+    }
+
+    private static let timeSkippingBundleIdentifiers: Set<String> = [
+        "app.podcast.cosmos",
+        "com.apple.podcasts"
+    ]
 
     init() {
         media.onTrackInfoReceived = { [weak self] info in
@@ -67,14 +94,26 @@ final class PlaybackController: ObservableObject {
         }
     }
 
-    func skipBackward() {
+    func goBackward() {
         guard hasActiveSession else { return }
-        seek(by: -15)
+        switch transportMode {
+        case .timeSkipping:
+            seek(by: -15)
+        case .trackNavigation:
+            media.previousTrack()
+            refreshTrackInfoAfterTransportCommand()
+        }
     }
 
-    func skipForward() {
+    func goForward() {
         guard hasActiveSession else { return }
-        seek(by: 30)
+        switch transportMode {
+        case .timeSkipping:
+            seek(by: 30)
+        case .trackNavigation:
+            media.nextTrack()
+            refreshTrackInfoAfterTransportCommand()
+        }
     }
 
     private func seek(by offset: TimeInterval) {
@@ -88,6 +127,14 @@ final class PlaybackController: ObservableObject {
         elapsedTime = targetTime
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            self?.media.getTrackInfo { [weak self] info in
+                self?.receive(info)
+            }
+        }
+    }
+
+    private func refreshTrackInfoAfterTransportCommand() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
             self?.media.getTrackInfo { [weak self] info in
                 self?.receive(info)
             }

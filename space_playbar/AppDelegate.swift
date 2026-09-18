@@ -8,7 +8,7 @@ import SwiftUI
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let playback = PlaybackController()
     private var statusItem: NSStatusItem?
-    private var hostingView: NSHostingView<StatusBarControlsView>?
+    private var statusControlView: StatusBarControlView?
     private var sourceNameObservation: AnyCancellable?
     private lazy var updaterController = SPUStandardUpdaterController(
         startingUpdater: true,
@@ -23,35 +23,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         _ = updaterController
 
         let item = NSStatusBar.system.statusItem(withLength: Self.statusItemLength(for: playback.applicationName))
-        guard let button = item.button else { return }
-
-        button.image = nil
-        button.title = ""
-        button.action = nil
-        button.toolTip = "Cueto"
-
-        let rootView = StatusBarControlsView(
+        let controlView = StatusBarControlView(
             playback: playback,
             onOpenCueto: { [weak self] in self?.openCueto() },
             onQuit: { NSApplication.shared.terminate(nil) }
         )
-        let hostingView = NSHostingView(rootView: rootView)
-        hostingView.translatesAutoresizingMaskIntoConstraints = false
-        button.addSubview(hostingView)
+        controlView.frame = NSRect(
+            x: 0,
+            y: 0,
+            width: item.length,
+            height: NSStatusBar.system.thickness
+        )
+        item.view = controlView
 
-        NSLayoutConstraint.activate([
-            hostingView.leadingAnchor.constraint(equalTo: button.leadingAnchor),
-            hostingView.trailingAnchor.constraint(equalTo: button.trailingAnchor),
-            hostingView.topAnchor.constraint(equalTo: button.topAnchor),
-            hostingView.bottomAnchor.constraint(equalTo: button.bottomAnchor)
-        ])
-
-        self.hostingView = hostingView
+        self.statusControlView = controlView
         self.statusItem = item
         sourceNameObservation = playback.$applicationName
             .removeDuplicates()
-            .sink { [weak item] name in
-                item?.length = Self.statusItemLength(for: name)
+            .sink { [weak item, weak controlView] name in
+                let length = Self.statusItemLength(for: name)
+                item?.length = length
+                controlView?.frame.size.width = length
             }
     }
 
