@@ -9,6 +9,10 @@ struct NowPlayingPopover: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
+            if playback.activeAudioSourceCount > 1 {
+                activeAudioSources
+            }
+
             HStack(spacing: 10) {
                 if let icon = playback.applicationIcon {
                     Image(nsImage: icon)
@@ -65,6 +69,42 @@ struct NowPlayingPopover: View {
         }
         .padding(16)
         .frame(width: 278)
+    }
+
+    private var activeAudioSources: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text("正在发声 · \(playback.activeAudioSourceCount)")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            ForEach(playback.activeAudioSources) { source in
+                HStack(spacing: 8) {
+                    if let icon = source.icon {
+                        Image(nsImage: icon)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 18, height: 18)
+                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
+                    }
+                    Text(source.applicationName)
+                        .font(.system(size: 12, weight: .medium))
+                        .lineLimit(1)
+                    Spacer()
+                    if source.bundleIdentifier == playback.bundleIdentifier {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(Color.accentColor)
+                            .accessibilityLabel("当前控制")
+                    } else {
+                        Text("正在发声")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .frame(minHeight: 22)
+            }
+        }
+        .padding(10)
+        .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 
     private func playbackProgress(elapsedTime: TimeInterval, duration: TimeInterval) -> some View {

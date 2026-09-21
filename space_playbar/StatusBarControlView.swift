@@ -11,6 +11,9 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
     private var observations = Set<AnyCancellable>()
     private var popover: NSPopover?
     private let separator = NSBox()
+    private var sourceWidthConstraint: NSLayoutConstraint?
+    private var isCompact = false
+    private var pendingSourceRefresh: DispatchWorkItem?
 
     private lazy var sourceButton = makeButton(action: #selector(showNowPlaying))
     private lazy var backwardButton = makeSymbolButton(
@@ -43,6 +46,7 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
         refreshSource()
         refreshPlaybackState()
         refreshAvailability()
+        refreshLayoutMode()
         refreshAppearance()
     }
 
@@ -102,6 +106,8 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
 
+        let sourceWidthConstraint = sourceButton.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -80)
+        self.sourceWidthConstraint = sourceWidthConstraint
         NSLayoutConstraint.activate([
             stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 3),
             stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -3),
@@ -109,7 +115,7 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
             stack.bottomAnchor.constraint(equalTo: bottomAnchor),
             separator.widthAnchor.constraint(equalToConstant: 1),
             separator.heightAnchor.constraint(equalToConstant: 14),
-            sourceButton.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -80),
+            sourceWidthConstraint,
             sourceButton.heightAnchor.constraint(equalTo: heightAnchor),
             backwardButton.widthAnchor.constraint(equalToConstant: 25),
             backwardButton.heightAnchor.constraint(equalToConstant: 18),
@@ -144,13 +150,16 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
         playback.$applicationName
             .combineLatest(playback.$applicationIcon)
             .receive(on: RunLoop.main)
-            .sink { [weak self] _, _ in self?.refreshSource() }
+            .sink { [weak self] _, _ in self?.scheduleSourceRefresh() }
             .store(in: &observations)
 
         playback.$bundleIdentifier
             .removeDuplicates()
             .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.refreshTransportControls() }
+            .sink { [weak self] _ in
+                self?.refreshTransportControls()
+                self?.scheduleSourceRefresh()
+            }
             .store(in: &observations)
 
         playback.$isPlaying
@@ -162,20 +171,55 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
         playback.$hasActiveSession
             .removeDuplicates()
             .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.refreshAvailability() }
+            .sink { [weak self] _ in
+                self?.refreshAvailability()
+                self?.refreshLayoutMode()
+            }
+            .store(in: &observations)
+
+        playback.$activeAudioSources
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.scheduleSourceRefresh() }
             .store(in: &observations)
     }
 
+    private func scheduleSourceRefresh() {
+        pendingSourceRefresh?.cancel()
+        let refresh = DispatchWorkItem { [weak self] in self?.refreshSource() }
+        pendingSourceRefresh = refresh
+        DispatchQueue.main.async(execute: refresh)
+    }
+
     private func refreshSource() {
-        sourceButton.statusTitle = playback.applicationName
+        let image: NSImage?
         if let icon = playback.applicationIcon {
-            let image = icon.copy() as? NSImage
+            image = icon.copy() as? NSImage
             image?.size = NSSize(width: 15, height: 15)
-            sourceButton.statusImage = image
         } else {
-            sourceButton.statusImage = nil
+            image = nil
         }
+        sourceButton.updateSource(
+            title: playback.applicationName,
+            image: image,
+            identifier: playback.bundleIdentifier,
+            count: playback.activeAudioSourceCount
+        )
         refreshAppearance()
+    }
+
+    private func refreshLayoutMode() {
+        let compact = !playback.hasActiveSession
+        guard compact != isCompact else { return }
+        isCompact = compact
+        separator.isHidden = compact
+        backwardButton.isHidden = compact
+        playPauseButton.isHidden = compact
+        forwardButton.isHidden = compact
+        sourceWidthConstraint?.constant = compact ? 0 : -80
+        sourceButton.compactAppIconOnly = compact
+        sourceButton.toolTip = compact ? "打开 Cueto" : "查看当前播放来源"
+        sourceButton.setAccessibilityLabel(compact ? "打开 Cueto" : "当前播放来源")
+        needsLayout = true
     }
 
     private func refreshPlaybackState() {
@@ -217,6 +261,10 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
     }
 
     @objc private func showNowPlaying() {
+        guard playback.hasActiveSession else {
+            onOpenCueto()
+            return
+        }
         if let popover, popover.isShown {
             sourceButton.showsSelection = false
             popover.performClose(nil)
@@ -281,6 +329,12 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
 }
 
 private final class StatusBarNativeButton: NSButton {
+    private struct SourcePresentation {
+        let title: String
+        let image: NSImage?
+        let identifier: String?
+    }
+
     enum Kind {
         case source
         case symbol(String)
@@ -295,6 +349,12 @@ private final class StatusBarNativeButton: NSButton {
     var statusImage: NSImage? {
         didSet { needsDisplay = true }
     }
+    var sourceCount = 0 {
+        didSet { needsDisplay = true }
+    }
+    var compactAppIconOnly = false {
+        didSet { needsDisplay = true }
+    }
     var foregroundColor = NSColor.white {
         didSet { needsDisplay = true }
     }
@@ -302,6 +362,68 @@ private final class StatusBarNativeButton: NSButton {
         didSet { needsDisplay = true }
     }
     private var isPressing = false
+    private var displayedSource: SourcePresentation?
+    private var outgoingSource: SourcePresentation?
+    private var sourceTransitionProgress: CGFloat = 1
+    private var sourceTransitionTimer: Timer?
+    private var sourceTransitionStartedAt = Date()
+    private let sourceTransitionDuration: TimeInterval = 0.22
+
+    deinit {
+        sourceTransitionTimer?.invalidate()
+    }
+
+    func updateSource(title: String, image: NSImage?, identifier: String?, count: Int) {
+        sourceCount = count
+        statusTitle = title
+        statusImage = image
+
+        let incoming = SourcePresentation(title: title, image: image, identifier: identifier)
+        guard let current = displayedSource else {
+            displayedSource = incoming
+            needsDisplay = true
+            return
+        }
+
+        guard current.identifier != identifier else {
+            displayedSource = incoming
+            needsDisplay = true
+            return
+        }
+
+        sourceTransitionTimer?.invalidate()
+        outgoingSource = current
+        displayedSource = incoming
+
+        guard current.identifier != nil,
+              identifier != nil,
+              !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            outgoingSource = nil
+            sourceTransitionProgress = 1
+            needsDisplay = true
+            return
+        }
+
+        sourceTransitionProgress = 0
+        sourceTransitionStartedAt = Date()
+        let timer = Timer(timeInterval: 1 / 60, repeats: true) { [weak self] timer in
+            guard let self else {
+                timer.invalidate()
+                return
+            }
+            let elapsed = Date().timeIntervalSince(self.sourceTransitionStartedAt)
+            let linearProgress = min(max(elapsed / self.sourceTransitionDuration, 0), 1)
+            self.sourceTransitionProgress = CGFloat(1 - pow(1 - linearProgress, 3))
+            self.needsDisplay = true
+            if linearProgress >= 1 {
+                timer.invalidate()
+                self.outgoingSource = nil
+            }
+        }
+        sourceTransitionTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+        needsDisplay = true
+    }
 
     override func mouseDown(with event: NSEvent) {
         isPressing = true
@@ -343,21 +465,84 @@ private final class StatusBarNativeButton: NSButton {
     }
 
     private func drawSource(opacity: CGFloat) {
-        let iconRect = NSRect(x: 5, y: floor((bounds.height - 15) / 2), width: 15, height: 15)
-        if let statusImage {
-            statusImage.draw(in: iconRect, from: .zero, operation: .sourceOver, fraction: opacity, respectFlipped: true, hints: nil)
-        } else {
-            drawSymbol("waveform", pointSize: 12, opacity: opacity, centeredIn: iconRect)
+        if compactAppIconOnly {
+            let appIcon = NSApplication.shared.applicationIconImage
+            let iconRect = NSRect(x: bounds.midX - 9, y: bounds.midY - 9, width: 18, height: 18)
+            appIcon?.draw(
+                in: iconRect,
+                from: .zero,
+                operation: .sourceOver,
+                fraction: opacity,
+                respectFlipped: true,
+                hints: nil
+            )
+            return
+        }
+
+        let countWidth: CGFloat = sourceCount > 1 ? 19 : 0
+        if sourceCount > 1 {
+            let symbolName = sourceCount <= 9 ? "\(sourceCount).circle.fill" : "9.plus.circle.fill"
+            let countRect = NSRect(x: 3, y: floor((bounds.height - 16) / 2), width: 16, height: 16)
+            drawSymbol(
+                symbolName,
+                pointSize: 14,
+                opacity: opacity,
+                color: .controlAccentColor,
+                centeredIn: countRect
+            )
+        }
+
+        let progress = sourceTransitionProgress
+        if let outgoingSource, progress < 1 {
+            drawSourceIdentity(
+                outgoingSource,
+                countWidth: countWidth,
+                xOffset: -16 * progress,
+                opacity: opacity * (1 - progress)
+            )
+        }
+        if let displayedSource {
+            let isTransitioning = outgoingSource != nil && progress < 1
+            drawSourceIdentity(
+                displayedSource,
+                countWidth: countWidth,
+                xOffset: isTransitioning ? 18 * (1 - progress) : 0,
+                opacity: opacity * (isTransitioning ? progress : 1)
+            )
         }
 
         let chevronRect = NSRect(x: bounds.maxX - 12, y: floor((bounds.height - 8) / 2), width: 7, height: 8)
         drawSymbol("chevron.down", pointSize: 7, opacity: opacity * 0.72, centeredIn: chevronRect)
+    }
+
+    private func drawSourceIdentity(
+        _ source: SourcePresentation,
+        countWidth: CGFloat,
+        xOffset: CGFloat,
+        opacity: CGFloat
+    ) {
+        let iconRect = NSRect(
+            x: 5 + countWidth + xOffset,
+            y: floor((bounds.height - 15) / 2),
+            width: 15,
+            height: 15
+        )
+        if let image = source.image {
+            image.draw(in: iconRect, from: .zero, operation: .sourceOver, fraction: opacity, respectFlipped: true, hints: nil)
+        } else {
+            drawSymbol("waveform", pointSize: 12, opacity: opacity, centeredIn: iconRect)
+        }
 
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
         paragraph.lineBreakMode = .byTruncatingTail
-        let textRect = NSRect(x: 24, y: floor((bounds.height - 16) / 2), width: max(bounds.width - 40, 0), height: 16)
-        (statusTitle as NSString).draw(
+        let textRect = NSRect(
+            x: 24 + countWidth + xOffset,
+            y: floor((bounds.height - 16) / 2),
+            width: max(bounds.width - 40 - countWidth, 0),
+            height: 16
+        )
+        (source.title as NSString).draw(
             with: textRect,
             options: [.usesLineFragmentOrigin, .truncatesLastVisibleLine],
             attributes: [
@@ -368,9 +553,17 @@ private final class StatusBarNativeButton: NSButton {
         )
     }
 
-    private func drawSymbol(_ name: String, pointSize: CGFloat, opacity: CGFloat, centeredIn rect: NSRect) {
+    private func drawSymbol(
+        _ name: String,
+        pointSize: CGFloat,
+        opacity: CGFloat,
+        color: NSColor? = nil,
+        centeredIn rect: NSRect
+    ) {
         let baseConfiguration = NSImage.SymbolConfiguration(pointSize: pointSize, weight: .semibold)
-        let colorConfiguration = NSImage.SymbolConfiguration(paletteColors: [foregroundColor.withAlphaComponent(opacity)])
+        let colorConfiguration = NSImage.SymbolConfiguration(
+            hierarchicalColor: (color ?? foregroundColor).withAlphaComponent(opacity)
+        )
         guard let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
             .withSymbolConfiguration(baseConfiguration.applying(colorConfiguration)) else { return }
         let size = image.size

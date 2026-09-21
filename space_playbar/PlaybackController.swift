@@ -19,9 +19,13 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var applicationIcon: NSImage?
     @Published private(set) var elapsedTime: TimeInterval?
     @Published private(set) var duration: TimeInterval?
+    @Published private(set) var activeAudioSources: [ActiveAudioSource] = []
 
     private let media = MediaController()
+    private let audioSourceMonitor = ActiveAudioSourceMonitor()
     private var progressTimer: AnyCancellable?
+    private var audioSourceObservation: AnyCancellable?
+    private var detectedAudioSources: [ActiveAudioSource] = []
     private var referenceElapsedTime: TimeInterval?
     private var referenceDate = Date()
     private var playbackRate = 0.0
@@ -62,11 +66,20 @@ final class PlaybackController: ObservableObject {
         media.getTrackInfo { [weak self] info in
             self?.receive(info)
         }
+        audioSourceObservation = audioSourceMonitor.$sources
+            .sink { [weak self] sources in
+                self?.detectedAudioSources = sources
+                self?.refreshActiveAudioSources()
+            }
         progressTimer = Timer.publish(every: 0.5, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
                 self?.refreshDisplayedProgress()
             }
+    }
+
+    var activeAudioSourceCount: Int {
+        activeAudioSources.count
     }
 
     func playPause() {
@@ -170,6 +183,7 @@ final class PlaybackController: ObservableObject {
             duration = nil
             referenceElapsedTime = nil
             playbackRate = 0
+            refreshActiveAudioSources()
             return
         }
 
@@ -192,7 +206,31 @@ final class PlaybackController: ObservableObject {
         referenceElapsedTime = payload.currentElapsedTime ?? payload.elapsedTimeMicros.map { $0 / 1_000_000 }
         referenceDate = Date()
         playbackRate = reportedPlaying ? (payload.playbackRate ?? 1) : 0
+        refreshActiveAudioSources(processID: payload.PID)
         refreshDisplayedProgress()
+    }
+
+    private func refreshActiveAudioSources(processID: pid_t? = nil) {
+        var sources = detectedAudioSources
+        if hasActiveSession,
+           let bundleIdentifier,
+           !sources.contains(where: { $0.bundleIdentifier == bundleIdentifier }) {
+            sources.append(
+                ActiveAudioSource(
+                    processID: processID ?? 0,
+                    bundleIdentifier: bundleIdentifier,
+                    applicationName: applicationName
+                )
+            )
+        }
+        sources.sort { left, right in
+            if left.bundleIdentifier == bundleIdentifier { return true }
+            if right.bundleIdentifier == bundleIdentifier { return false }
+            return left.applicationName.localizedStandardCompare(right.applicationName) == .orderedAscending
+        }
+        if sources != activeAudioSources {
+            activeAudioSources = sources
+        }
     }
 
     private func sourceName(for bundleIdentifier: String?) -> String {
