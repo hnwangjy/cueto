@@ -69,7 +69,7 @@ final class PlaybackController: ObservableObject {
         audioSourceObservation = audioSourceMonitor.$sources
             .sink { [weak self] sources in
                 self?.detectedAudioSources = sources
-                self?.refreshActiveAudioSources()
+                self?.reconcileDisplayedSourceWithRunningAudio()
             }
         progressTimer = Timer.publish(every: 0.5, on: .main, in: .common)
             .autoconnect()
@@ -169,6 +169,9 @@ final class PlaybackController: ObservableObject {
 
     private func receive(_ info: TrackInfo?) {
         guard let payload = info?.payload else {
+            if adoptRunningAudioSourceIfNeeded() {
+                return
+            }
             if pendingPlaybackState != nil, Date() < pendingStateDeadline {
                 return
             }
@@ -187,11 +190,17 @@ final class PlaybackController: ObservableObject {
             return
         }
 
+        let reportedPlaying = payload.isPlaying ?? ((payload.playbackRate ?? 0) > 0)
+        if !reportedPlaying,
+           let payloadBundleIdentifier = payload.bundleIdentifier,
+           adoptRunningAudioSourceIfNeeded(excluding: payloadBundleIdentifier) {
+            return
+        }
+
         applicationName = payload.applicationName?.nonEmpty ?? sourceName(for: payload.bundleIdentifier)
         bundleIdentifier = payload.bundleIdentifier
         title = payload.title?.nonEmpty
         artist = payload.artist?.nonEmpty
-        let reportedPlaying = payload.isPlaying ?? ((payload.playbackRate ?? 0) > 0)
         if let pendingPlaybackState {
             if reportedPlaying == pendingPlaybackState || Date() >= pendingStateDeadline {
                 self.pendingPlaybackState = nil
@@ -208,6 +217,44 @@ final class PlaybackController: ObservableObject {
         playbackRate = reportedPlaying ? (payload.playbackRate ?? 1) : 0
         refreshActiveAudioSources(processID: payload.PID)
         refreshDisplayedProgress()
+    }
+
+    private func reconcileDisplayedSourceWithRunningAudio() {
+        if let bundleIdentifier,
+           detectedAudioSources.contains(where: { $0.bundleIdentifier == bundleIdentifier }) {
+            refreshActiveAudioSources()
+            return
+        }
+
+        if adoptRunningAudioSourceIfNeeded(excluding: bundleIdentifier) {
+            return
+        }
+
+        refreshActiveAudioSources()
+    }
+
+    @discardableResult
+    private func adoptRunningAudioSourceIfNeeded(excluding excludedBundleIdentifier: String? = nil) -> Bool {
+        guard let source = detectedAudioSources.first(where: {
+            $0.bundleIdentifier != excludedBundleIdentifier
+        }) else {
+            return false
+        }
+
+        applicationName = source.applicationName
+        bundleIdentifier = source.bundleIdentifier
+        applicationIcon = source.icon
+        isPlaying = true
+        hasActiveSession = true
+        title = nil
+        artist = nil
+        elapsedTime = nil
+        duration = nil
+        referenceElapsedTime = nil
+        playbackRate = 1
+        pendingPlaybackState = nil
+        refreshActiveAudioSources(processID: source.processID)
+        return true
     }
 
     private func refreshActiveAudioSources(processID: pid_t? = nil) {

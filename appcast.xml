@@ -3,6 +3,33 @@
     <channel>
         <title>Cueto</title>
         <item>
+            <title>1.0.8</title>
+            <pubDate>Wed, 23 Sep 2026 09:15:48 +0800</pubDate>
+            <link>https://github.com/hnwangjy/cueto</link>
+            <sparkle:version>9</sparkle:version>
+            <sparkle:shortVersionString>1.0.8</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.7</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Cueto 1.0.8
+
+## 改进
+
+- **多来源切换更准确**：同时播放多个应用时，如果当前控制的应用暂停，Cueto 会自动切换到仍在发声的应用。
+- **来源数量更醒目**：多来源数字提示改为白色圆形徽标，并在出现时加入轻微的缩放淡入动画。
+
+## 修复
+
+- 修复两个音频同时播放时，暂停当前应用后菜单栏仍停留在已暂停应用的问题。
+- 修复 Core Audio 暂时保留已暂停来源时，Cueto 无法及时切换到另一个播放来源的问题。
+
+## 安装说明
+
+此版本已使用 Developer ID 签名，但尚未经过 Apple 公证。首次启动时如果 macOS 阻止打开，请在 Finder 中右键 Cueto 并选择“打开”。
+
+SHA-256：`0c00e2e0f41a6ed2caed730ca996110e41c5206b63ae345f2b1afe88c7118a69`
+]]></description>
+            <enclosure url="https://github.com/hnwangjy/cueto/releases/download/v1.0.8/Cueto-1.0.8.dmg" length="3837583" type="application/octet-stream" sparkle:edSignature="YAwg+ukRDNqrXtifsgqlNVw1mEu9U1m6bT4igJwRxlGeQl6t2d8WfOF+6zoXdCvvNcyBW2JjjUxQqmqI8C0JBQ=="/>
+        </item>
+        <item>
             <title>1.0.7</title>
             <pubDate>Mon, 21 Sep 2026 14:10:16 +0800</pubDate>
             <link>https://github.com/hnwangjy/cueto</link>

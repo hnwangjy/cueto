@@ -349,9 +349,7 @@ private final class StatusBarNativeButton: NSButton {
     var statusImage: NSImage? {
         didSet { needsDisplay = true }
     }
-    var sourceCount = 0 {
-        didSet { needsDisplay = true }
-    }
+    private var sourceCount = 0
     var compactAppIconOnly = false {
         didSet { needsDisplay = true }
     }
@@ -368,13 +366,18 @@ private final class StatusBarNativeButton: NSButton {
     private var sourceTransitionTimer: Timer?
     private var sourceTransitionStartedAt = Date()
     private let sourceTransitionDuration: TimeInterval = 0.22
+    private var badgeAppearanceProgress: CGFloat = 1
+    private var badgeAppearanceTimer: Timer?
+    private var badgeAppearanceStartedAt = Date()
+    private let badgeAppearanceDuration: TimeInterval = 0.18
 
     deinit {
         sourceTransitionTimer?.invalidate()
+        badgeAppearanceTimer?.invalidate()
     }
 
     func updateSource(title: String, image: NSImage?, identifier: String?, count: Int) {
-        sourceCount = count
+        updateSourceCount(count)
         statusTitle = title
         statusImage = image
 
@@ -421,6 +424,38 @@ private final class StatusBarNativeButton: NSButton {
             }
         }
         sourceTransitionTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+        needsDisplay = true
+    }
+
+    private func updateSourceCount(_ count: Int) {
+        let shouldAnimateAppearance = sourceCount <= 1 && count > 1
+        sourceCount = count
+        badgeAppearanceTimer?.invalidate()
+
+        guard shouldAnimateAppearance,
+              !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            badgeAppearanceProgress = 1
+            needsDisplay = true
+            return
+        }
+
+        badgeAppearanceProgress = 0
+        badgeAppearanceStartedAt = Date()
+        let timer = Timer(timeInterval: 1 / 60, repeats: true) { [weak self] timer in
+            guard let self else {
+                timer.invalidate()
+                return
+            }
+            let elapsed = Date().timeIntervalSince(self.badgeAppearanceStartedAt)
+            let linearProgress = min(max(elapsed / self.badgeAppearanceDuration, 0), 1)
+            self.badgeAppearanceProgress = CGFloat(1 - pow(1 - linearProgress, 3))
+            self.needsDisplay = true
+            if linearProgress >= 1 {
+                timer.invalidate()
+            }
+        }
+        badgeAppearanceTimer = timer
         RunLoop.main.add(timer, forMode: .common)
         needsDisplay = true
     }
@@ -481,15 +516,8 @@ private final class StatusBarNativeButton: NSButton {
 
         let countWidth: CGFloat = sourceCount > 1 ? 19 : 0
         if sourceCount > 1 {
-            let symbolName = sourceCount <= 9 ? "\(sourceCount).circle.fill" : "9.plus.circle.fill"
             let countRect = NSRect(x: 3, y: floor((bounds.height - 16) / 2), width: 16, height: 16)
-            drawSymbol(
-                symbolName,
-                pointSize: 14,
-                opacity: opacity,
-                color: .controlAccentColor,
-                centeredIn: countRect
-            )
+            drawSourceCountBadge(in: countRect, opacity: opacity)
         }
 
         let progress = sourceTransitionProgress
@@ -513,6 +541,45 @@ private final class StatusBarNativeButton: NSButton {
 
         let chevronRect = NSRect(x: bounds.maxX - 12, y: floor((bounds.height - 8) / 2), width: 7, height: 8)
         drawSymbol("chevron.down", pointSize: 7, opacity: opacity * 0.72, centeredIn: chevronRect)
+    }
+
+    private func drawSourceCountBadge(in rect: NSRect, opacity: CGFloat) {
+        let progress = badgeAppearanceProgress
+        let scale = 0.72 + 0.28 * progress
+        let scaledRect = NSRect(
+            x: rect.midX - rect.width * scale / 2,
+            y: rect.midY - rect.height * scale / 2,
+            width: rect.width * scale,
+            height: rect.height * scale
+        )
+        let badgeOpacity = opacity * progress
+
+        NSColor.white.withAlphaComponent(badgeOpacity).setFill()
+        NSColor.black.withAlphaComponent(0.12 * badgeOpacity).setStroke()
+        let badgePath = NSBezierPath(ovalIn: scaledRect.insetBy(dx: 0.5, dy: 0.5))
+        badgePath.lineWidth = 0.5
+        badgePath.fill()
+        badgePath.stroke()
+
+        let label = sourceCount <= 9 ? "\(sourceCount)" : "9+"
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        let fontSize: CGFloat = sourceCount <= 9 ? 9 : 7
+        let textRect = NSRect(
+            x: scaledRect.minX,
+            y: scaledRect.midY - fontSize / 2 - 1,
+            width: scaledRect.width,
+            height: fontSize + 3
+        )
+        (label as NSString).draw(
+            with: textRect,
+            options: [.usesLineFragmentOrigin],
+            attributes: [
+                .font: NSFont.systemFont(ofSize: fontSize, weight: .bold),
+                .foregroundColor: NSColor.black.withAlphaComponent(0.82 * badgeOpacity),
+                .paragraphStyle: paragraph
+            ]
+        )
     }
 
     private func drawSourceIdentity(
