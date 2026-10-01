@@ -62,10 +62,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hasActiveSession: Bool = true,
         sourceCount: Int = 1
     ) -> CGFloat {
-        guard hasActiveSession else { return 30 }
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.systemFont(ofSize: 12, weight: .semibold)
         ]
+        if !hasActiveSession {
+            let idleNameWidth = ceil(("Cueto" as NSString).size(withAttributes: attributes).width)
+            return 40 + idleNameWidth
+        }
         let nameWidth = ceil((applicationName as NSString).size(withAttributes: attributes).width)
         let countWidth: CGFloat = sourceCount > 1 ? 18 : 0
         return min(max(136 + countWidth + nameWidth, 174), 246)

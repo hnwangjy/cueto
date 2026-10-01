@@ -12,7 +12,7 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
     private var popover: NSPopover?
     private let separator = NSBox()
     private var sourceWidthConstraint: NSLayoutConstraint?
-    private var isCompact = false
+    private var isIdleState = false
     private var pendingSourceRefresh: DispatchWorkItem?
 
     private lazy var sourceButton = makeButton(action: #selector(showNowPlaying))
@@ -174,6 +174,7 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
             .sink { [weak self] _ in
                 self?.refreshAvailability()
                 self?.refreshLayoutMode()
+                self?.scheduleSourceRefresh()
             }
             .store(in: &observations)
 
@@ -191,34 +192,38 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
     }
 
     private func refreshSource() {
+        let hasActiveSession = playback.hasActiveSession
         let image: NSImage?
-        if let icon = playback.applicationIcon {
+        if hasActiveSession, let icon = playback.applicationIcon {
             image = icon.copy() as? NSImage
             image?.size = NSSize(width: 15, height: 15)
         } else {
             image = nil
         }
         sourceButton.updateSource(
-            title: playback.applicationName,
+            title: hasActiveSession ? playback.applicationName : "Cueto",
             image: image,
-            identifier: playback.bundleIdentifier,
-            count: playback.activeAudioSourceCount
+            identifier: hasActiveSession
+                ? playback.bundleIdentifier ?? "active:\(playback.applicationName)"
+                : StatusBarNativeButton.idleSourceIdentifier,
+            count: hasActiveSession ? playback.activeAudioSourceCount : 0,
+            fallbackSymbolName: hasActiveSession ? "waveform" : "waveform.mid"
         )
         refreshAppearance()
     }
 
     private func refreshLayoutMode() {
-        let compact = !playback.hasActiveSession
-        guard compact != isCompact else { return }
-        isCompact = compact
-        separator.isHidden = compact
-        backwardButton.isHidden = compact
-        playPauseButton.isHidden = compact
-        forwardButton.isHidden = compact
-        sourceWidthConstraint?.constant = compact ? 0 : -80
-        sourceButton.compactAppIconOnly = compact
-        sourceButton.toolTip = compact ? "打开 Cueto" : "查看当前播放来源"
-        sourceButton.setAccessibilityLabel(compact ? "打开 Cueto" : "当前播放来源")
+        let idle = !playback.hasActiveSession
+        guard idle != isIdleState else { return }
+        isIdleState = idle
+        separator.isHidden = idle
+        backwardButton.isHidden = idle
+        playPauseButton.isHidden = idle
+        forwardButton.isHidden = idle
+        sourceWidthConstraint?.constant = idle ? 0 : -80
+        sourceButton.isIdleState = idle
+        sourceButton.toolTip = idle ? "打开 Cueto" : "查看当前播放来源"
+        sourceButton.setAccessibilityLabel(idle ? "打开 Cueto" : "当前播放来源")
         needsLayout = true
     }
 
@@ -254,17 +259,14 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
 
     private func refreshAvailability() {
         let isAvailable = playback.hasActiveSession
-        [sourceButton, backwardButton, playPauseButton, forwardButton].forEach {
+        sourceButton.isEnabled = true
+        [backwardButton, playPauseButton, forwardButton].forEach {
             $0.isEnabled = isAvailable
         }
-        alphaValue = isAvailable ? 1 : 0.62
+        alphaValue = 1
     }
 
     @objc private func showNowPlaying() {
-        guard playback.hasActiveSession else {
-            onOpenCueto()
-            return
-        }
         if let popover, popover.isShown {
             sourceButton.showsSelection = false
             popover.performClose(nil)
@@ -276,17 +278,32 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
         popover.behavior = .transient
         popover.animates = true
         popover.delegate = self
-        popover.contentViewController = NSHostingController(
-            rootView: NowPlayingPopover(
-                playback: playback,
-                onOpenCueto: { [weak self] in
-                    self?.popover?.performClose(nil)
-                    self?.onOpenCueto()
-                },
-                onQuit: { [weak self] in self?.onQuit() }
+
+        let openAction: () -> Void = { [weak self] in
+            self?.popover?.performClose(nil)
+            self?.onOpenCueto()
+        }
+        let quitAction: () -> Void = { [weak self] in self?.onQuit() }
+        let contentViewController: NSViewController
+        if playback.hasActiveSession {
+            contentViewController = NSHostingController(
+                rootView: NowPlayingPopover(
+                    playback: playback,
+                    onOpenCueto: openAction,
+                    onQuit: quitAction
+                )
+                .environment(\.controlActiveState, .active)
             )
-            .environment(\.controlActiveState, .active)
-        )
+        } else {
+            contentViewController = NSHostingController(
+                rootView: IdlePopover(
+                    onOpenCueto: openAction,
+                    onQuit: quitAction
+                )
+                .environment(\.controlActiveState, .active)
+            )
+        }
+        popover.contentViewController = contentViewController
         self.popover = popover
         sourceButton.showsSelection = true
         popover.show(relativeTo: sourceButton.bounds, of: sourceButton, preferredEdge: .minY)
@@ -329,10 +346,13 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
 }
 
 private final class StatusBarNativeButton: NSButton {
+    static let idleSourceIdentifier = "com.wangjiayuan.cueto.idle"
+
     private struct SourcePresentation {
         let title: String
         let image: NSImage?
         let identifier: String?
+        let fallbackSymbolName: String
     }
 
     enum Kind {
@@ -350,7 +370,7 @@ private final class StatusBarNativeButton: NSButton {
         didSet { needsDisplay = true }
     }
     private var sourceCount = 0
-    var compactAppIconOnly = false {
+    var isIdleState = false {
         didSet { needsDisplay = true }
     }
     var foregroundColor = NSColor.white {
@@ -376,12 +396,23 @@ private final class StatusBarNativeButton: NSButton {
         badgeAppearanceTimer?.invalidate()
     }
 
-    func updateSource(title: String, image: NSImage?, identifier: String?, count: Int) {
+    func updateSource(
+        title: String,
+        image: NSImage?,
+        identifier: String?,
+        count: Int,
+        fallbackSymbolName: String
+    ) {
         updateSourceCount(count)
         statusTitle = title
         statusImage = image
 
-        let incoming = SourcePresentation(title: title, image: image, identifier: identifier)
+        let incoming = SourcePresentation(
+            title: title,
+            image: image,
+            identifier: identifier,
+            fallbackSymbolName: fallbackSymbolName
+        )
         guard let current = displayedSource else {
             displayedSource = incoming
             needsDisplay = true
@@ -500,20 +531,6 @@ private final class StatusBarNativeButton: NSButton {
     }
 
     private func drawSource(opacity: CGFloat) {
-        if compactAppIconOnly {
-            let appIcon = NSApplication.shared.applicationIconImage
-            let iconRect = NSRect(x: bounds.midX - 9, y: bounds.midY - 9, width: 18, height: 18)
-            appIcon?.draw(
-                in: iconRect,
-                from: .zero,
-                operation: .sourceOver,
-                fraction: opacity,
-                respectFlipped: true,
-                hints: nil
-            )
-            return
-        }
-
         let countWidth: CGFloat = sourceCount > 1 ? 19 : 0
         if sourceCount > 1 {
             let countRect = NSRect(x: 3, y: floor((bounds.height - 16) / 2), width: 16, height: 16)
@@ -539,8 +556,10 @@ private final class StatusBarNativeButton: NSButton {
             )
         }
 
-        let chevronRect = NSRect(x: bounds.maxX - 12, y: floor((bounds.height - 8) / 2), width: 7, height: 8)
-        drawSymbol("chevron.down", pointSize: 7, opacity: opacity * 0.72, centeredIn: chevronRect)
+        if !isIdleState {
+            let chevronRect = NSRect(x: bounds.maxX - 12, y: floor((bounds.height - 8) / 2), width: 7, height: 8)
+            drawSymbol("chevron.down", pointSize: 7, opacity: opacity * 0.72, centeredIn: chevronRect)
+        }
     }
 
     private func drawSourceCountBadge(in rect: NSRect, opacity: CGFloat) {
@@ -597,7 +616,7 @@ private final class StatusBarNativeButton: NSButton {
         if let image = source.image {
             image.draw(in: iconRect, from: .zero, operation: .sourceOver, fraction: opacity, respectFlipped: true, hints: nil)
         } else {
-            drawSymbol("waveform", pointSize: 12, opacity: opacity, centeredIn: iconRect)
+            drawSymbol(source.fallbackSymbolName, pointSize: 12, opacity: opacity, centeredIn: iconRect)
         }
 
         let paragraph = NSMutableParagraphStyle()
@@ -606,7 +625,7 @@ private final class StatusBarNativeButton: NSButton {
         let textRect = NSRect(
             x: 24 + countWidth + xOffset,
             y: floor((bounds.height - 16) / 2),
-            width: max(bounds.width - 40 - countWidth, 0),
+            width: max(bounds.width - (isIdleState ? 29 : 40) - countWidth, 0),
             height: 16
         )
         (source.title as NSString).draw(

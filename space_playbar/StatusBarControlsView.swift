@@ -1,6 +1,44 @@
 #if os(macOS)
 import SwiftUI
 
+struct IdlePopover: View {
+    let onOpenCueto: () -> Void
+    let onQuit: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 10) {
+                Image(systemName: "waveform.mid")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 34, height: 34)
+                    .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Cueto")
+                        .font(.headline)
+                    Text("当前没有音频正在播放")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Divider()
+
+            HStack {
+                Button("打开 Cueto", action: onOpenCueto)
+                Spacer()
+                Button("退出", action: onQuit)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .font(.system(size: 12, weight: .medium))
+        }
+        .padding(16)
+        .frame(width: 250)
+    }
+}
+
 struct NowPlayingPopover: View {
     @ObservedObject var playback: PlaybackController
     let onOpenCueto: () -> Void
