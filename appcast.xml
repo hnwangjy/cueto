@@ -23,9 +23,7 @@
 
 ## 安装说明
 
-此版本已使用 Developer ID 签名，但尚未经过 Apple 公证。首次启动时如果 macOS 阻止打开，请在 Finder 中右键 Cueto 并选择“打开”。
-
-SHA-256：`5b1249aee73a4a0c992e1d0d7b2d73616fe9292e0efe068582202a49a3b597e5`
+首次启动时如果 macOS 阻止打开，请在 Finder 中右键 Cueto 并选择“打开”。
 ]]></description>
             <enclosure url="https://github.com/hnwangjy/cueto/releases/download/v1.0.9/Cueto-1.0.9.dmg" length="3813380" type="application/octet-stream" sparkle:edSignature="AXeoTBP3NlgJOdDXxSAJtfExU425MA1A3tARLsvPxFM150RK2z24wcvIvPSIxJYAo70i1a8SPmA6hZxhnlgvCw=="/>
         </item>
