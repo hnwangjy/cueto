@@ -23,6 +23,7 @@ final class PlaybackController: ObservableObject {
 
     private let media = MediaController()
     private let audioSourceMonitor = ActiveAudioSourceMonitor()
+    let excludedApps: ExcludedAudioApps
     private var progressTimer: AnyCancellable?
     private var audioSourceObservation: AnyCancellable?
     private var detectedAudioSources: [ActiveAudioSource] = []
@@ -55,7 +56,8 @@ final class PlaybackController: ObservableObject {
         "com.apple.podcasts"
     ]
 
-    init() {
+    init(excludedApps: ExcludedAudioApps) {
+        self.excludedApps = excludedApps
         media.onTrackInfoReceived = { [weak self] info in
             self?.receive(info)
         }
@@ -71,12 +73,23 @@ final class PlaybackController: ObservableObject {
                 self?.detectedAudioSources = sources
                 self?.reconcileDisplayedSourceWithRunningAudio()
             }
+        excludedApps.$bundleIdentifiers
+            .dropFirst()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.reconcileDisplayedSourceWithRunningAudio()
+                self.media.getTrackInfo { [weak self] info in self?.receive(info) }
+            }
+            .store(in: &exclusionObservations)
         progressTimer = Timer.publish(every: 0.5, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
                 self?.refreshDisplayedProgress()
             }
     }
+
+    private var exclusionObservations = Set<AnyCancellable>()
 
     var activeAudioSourceCount: Int {
         activeAudioSources.count
@@ -191,6 +204,12 @@ final class PlaybackController: ObservableObject {
         }
 
         let reportedPlaying = payload.isPlaying ?? ((payload.playbackRate ?? 0) > 0)
+        if let identifier = payload.bundleIdentifier,
+           excludedApps.bundleIdentifiers.contains(identifier) {
+            if adoptRunningAudioSourceIfNeeded(excluding: identifier) { return }
+            clearDisplayedSource()
+            return
+        }
         if !reportedPlaying,
            let payloadBundleIdentifier = payload.bundleIdentifier,
            adoptRunningAudioSourceIfNeeded(excluding: payloadBundleIdentifier) {
@@ -221,6 +240,7 @@ final class PlaybackController: ObservableObject {
 
     private func reconcileDisplayedSourceWithRunningAudio() {
         if let bundleIdentifier,
+           !excludedApps.bundleIdentifiers.contains(bundleIdentifier),
            detectedAudioSources.contains(where: { $0.bundleIdentifier == bundleIdentifier }) {
             refreshActiveAudioSources()
             return
@@ -230,13 +250,18 @@ final class PlaybackController: ObservableObject {
             return
         }
 
-        refreshActiveAudioSources()
+        if let bundleIdentifier, excludedApps.bundleIdentifiers.contains(bundleIdentifier) {
+            clearDisplayedSource()
+        } else {
+            refreshActiveAudioSources()
+        }
     }
 
     @discardableResult
     private func adoptRunningAudioSourceIfNeeded(excluding excludedBundleIdentifier: String? = nil) -> Bool {
         guard let source = detectedAudioSources.first(where: {
             $0.bundleIdentifier != excludedBundleIdentifier
+                && !excludedApps.bundleIdentifiers.contains($0.bundleIdentifier)
         }) else {
             return false
         }
@@ -258,9 +283,12 @@ final class PlaybackController: ObservableObject {
     }
 
     private func refreshActiveAudioSources(processID: pid_t? = nil) {
-        var sources = detectedAudioSources
+        var sources = detectedAudioSources.filter {
+            !excludedApps.bundleIdentifiers.contains($0.bundleIdentifier)
+        }
         if hasActiveSession,
            let bundleIdentifier,
+           !excludedApps.bundleIdentifiers.contains(bundleIdentifier),
            !sources.contains(where: { $0.bundleIdentifier == bundleIdentifier }) {
             sources.append(
                 ActiveAudioSource(
@@ -278,6 +306,22 @@ final class PlaybackController: ObservableObject {
         if sources != activeAudioSources {
             activeAudioSources = sources
         }
+    }
+
+    private func clearDisplayedSource() {
+        applicationName = "未在播放"
+        bundleIdentifier = nil
+        title = nil
+        artist = nil
+        isPlaying = false
+        hasActiveSession = false
+        applicationIcon = nil
+        elapsedTime = nil
+        duration = nil
+        referenceElapsedTime = nil
+        playbackRate = 0
+        pendingPlaybackState = nil
+        refreshActiveAudioSources()
     }
 
     private func sourceName(for bundleIdentifier: String?) -> String {

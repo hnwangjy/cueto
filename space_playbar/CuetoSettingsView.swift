@@ -4,6 +4,33 @@ import Combine
 import ServiceManagement
 import Sparkle
 import SwiftUI
+import UniformTypeIdentifiers
+
+@MainActor
+final class ExcludedAudioApps: ObservableObject {
+    @Published private(set) var bundleIdentifiers: Set<String>
+    @Published private(set) var applicationNames: [String: String]
+
+    private let identifiersKey = "excludedAudioAppBundleIdentifiers"
+    private let namesKey = "excludedAudioAppNames"
+
+    init() {
+        bundleIdentifiers = Set(UserDefaults.standard.stringArray(forKey: identifiersKey) ?? [])
+        applicationNames = UserDefaults.standard.dictionary(forKey: namesKey) as? [String: String] ?? [:]
+    }
+
+    func setExcluded(_ excluded: Bool, identifier: String, name: String) {
+        if excluded {
+            applicationNames[identifier] = name
+            bundleIdentifiers.insert(identifier)
+        } else {
+            bundleIdentifiers.remove(identifier)
+            applicationNames.removeValue(forKey: identifier)
+        }
+        UserDefaults.standard.set(bundleIdentifiers.sorted(), forKey: identifiersKey)
+        UserDefaults.standard.set(applicationNames, forKey: namesKey)
+    }
+}
 
 @MainActor
 final class CuetoSettingsModel: ObservableObject {
@@ -61,6 +88,19 @@ final class CuetoSettingsModel: ObservableObject {
 
 struct CuetoSettingsView: View {
     @ObservedObject var model: CuetoSettingsModel
+    @ObservedObject var excludedApps: ExcludedAudioApps
+    @State private var runningApps: [NSRunningApplication] = []
+
+    private var appChoices: [(identifier: String, name: String)] {
+        var names = excludedApps.applicationNames
+        for app in runningApps where app.activationPolicy == .regular {
+            if let identifier = app.bundleIdentifier, identifier != Bundle.main.bundleIdentifier {
+                names[identifier] = app.localizedName ?? identifier
+            }
+        }
+        return names.map { ($0.key, $0.value) }
+            .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
 
     private var versionText: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
@@ -121,6 +161,47 @@ struct CuetoSettingsView: View {
             }
             .background(.quaternary.opacity(0.55), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
+            VStack(alignment: .leading, spacing: 9) {
+                HStack {
+                    Text("隐藏应用")
+                        .font(.system(size: 13, weight: .semibold))
+                    Spacer()
+                    Button("添加应用…", action: chooseApplication)
+                        .controlSize(.small)
+                }
+                Text("勾选后，该应用不会出现在控制栏、数量角标或播放来源列表中。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(appChoices, id: \.identifier) { app in
+                            Toggle(isOn: Binding(
+                                get: { excludedApps.bundleIdentifiers.contains(app.identifier) },
+                                set: { excludedApps.setExcluded($0, identifier: app.identifier, name: app.name) }
+                            )) {
+                                HStack(spacing: 9) {
+                                    if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.identifier) {
+                                        Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                                            .resizable()
+                                            .frame(width: 18, height: 18)
+                                    }
+                                    Text(app.name)
+                                        .lineLimit(1)
+                                }
+                            }
+                            .toggleStyle(.checkbox)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(height: 130)
+                .background(.quaternary.opacity(0.55), in: RoundedRectangle(cornerRadius: 10))
+            }
+
             if model.requiresLoginItemApproval {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Image(systemName: "exclamationmark.circle.fill")
@@ -150,8 +231,27 @@ struct CuetoSettingsView: View {
             }
         }
         .padding(26)
-        .frame(minWidth: 440, minHeight: 330)
-        .onAppear(perform: model.refresh)
+        .frame(minWidth: 440, minHeight: 500)
+        .onAppear {
+            model.refresh()
+            runningApps = NSWorkspace.shared.runningApplications
+        }
+    }
+
+    private func chooseApplication() {
+        let panel = NSOpenPanel()
+        panel.title = "选择要隐藏的应用"
+        panel.allowedContentTypes = [.applicationBundle]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        guard panel.runModal() == .OK,
+              let url = panel.url,
+              let bundle = Bundle(url: url),
+              let identifier = bundle.bundleIdentifier else { return }
+        let name = FileManager.default.displayName(atPath: url.path)
+            .replacingOccurrences(of: ".app", with: "")
+        excludedApps.setExcluded(true, identifier: identifier, name: name)
     }
 
     private func settingRow<Accessory: View>(

@@ -6,7 +6,8 @@ import SwiftUI
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let playback = PlaybackController()
+    private let excludedApps = ExcludedAudioApps()
+    private lazy var playback = PlaybackController(excludedApps: excludedApps)
     private var statusItem: NSStatusItem?
     private var statusControlView: StatusBarControlView?
     private var statusItemObservation: AnyCancellable?
@@ -83,12 +84,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             windowController = existingWindowController
         } else {
             model = CuetoSettingsModel(updater: updaterController.updater)
-            let rootView = CuetoSettingsView(model: model)
+            let rootView = CuetoSettingsView(model: model, excludedApps: excludedApps)
             let window = NSWindow(contentViewController: NSHostingController(rootView: rootView))
             window.title = "Cueto"
             window.styleMask = [.titled, .closable, .miniaturizable]
-            window.setContentSize(NSSize(width: 480, height: 360))
-            window.minSize = NSSize(width: 440, height: 330)
+            window.level = .floating
+            window.collectionBehavior.insert(.moveToActiveSpace)
+            window.setContentSize(NSSize(width: 480, height: 530))
+            window.minSize = NSSize(width: 440, height: 500)
             window.isReleasedWhenClosed = false
             window.center()
             windowController = NSWindowController(window: window)
@@ -100,6 +103,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApplication.shared.activate(ignoringOtherApps: true)
         windowController.showWindow(nil)
         windowController.window?.makeKeyAndOrderFront(nil)
+        windowController.window?.orderFrontRegardless()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
