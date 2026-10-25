@@ -20,13 +20,47 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var elapsedTime: TimeInterval?
     @Published private(set) var duration: TimeInterval?
     @Published private(set) var activeAudioSources: [ActiveAudioSource] = []
+    @Published private(set) var availableAudioSources: [ActiveAudioSource] = []
+    @Published private(set) var openingSourceIdentifier: String?
+    @Published private(set) var sourceOpenError: String?
+
+    func openApplication(for source: ActiveAudioSource) {
+        guard openingSourceIdentifier == nil,
+              !excludedApps.bundleIdentifiers.contains(source.bundleIdentifier) else { return }
+        sourceOpenError = nil
+        let runningApp = NSWorkspace.shared.runningApplications.first {
+            $0.bundleIdentifier == source.bundleIdentifier
+        }
+        guard let url = runningApp?.bundleURL
+                ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier: source.bundleIdentifier) else {
+            sourceOpenError = "找不到 \(source.applicationName)，应用可能已被移除。"
+            return
+        }
+        openingSourceIdentifier = source.bundleIdentifier
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        NSWorkspace.shared.openApplication(at: url, configuration: configuration) { [weak self] app, error in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.openingSourceIdentifier = nil
+                if let error {
+                    self.sourceOpenError = "无法打开 \(source.applicationName)：\(error.localizedDescription)"
+                } else {
+                    app?.unhide()
+                    app?.activate(options: [.activateAllWindows])
+                }
+            }
+        }
+    }
 
     private let media = MediaController()
     private let audioSourceMonitor = ActiveAudioSourceMonitor()
     let excludedApps: ExcludedAudioApps
     private var progressTimer: AnyCancellable?
     private var audioSourceObservation: AnyCancellable?
+    private var processSourceObservation: AnyCancellable?
     private var detectedAudioSources: [ActiveAudioSource] = []
+    private var detectedProcessSources: [ActiveAudioSource] = []
     private var referenceElapsedTime: TimeInterval?
     private var referenceDate = Date()
     private var playbackRate = 0.0
@@ -73,12 +107,18 @@ final class PlaybackController: ObservableObject {
                 self?.detectedAudioSources = sources
                 self?.reconcileDisplayedSourceWithRunningAudio()
             }
+        processSourceObservation = audioSourceMonitor.$processSources
+            .sink { [weak self] sources in
+                self?.detectedProcessSources = sources
+                self?.refreshAvailableAudioSources()
+            }
         excludedApps.$bundleIdentifiers
             .dropFirst()
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in
                 guard let self else { return }
                 self.reconcileDisplayedSourceWithRunningAudio()
+                self.refreshAvailableAudioSources()
                 self.media.getTrackInfo { [weak self] info in self?.receive(info) }
             }
             .store(in: &exclusionObservations)
@@ -200,10 +240,18 @@ final class PlaybackController: ObservableObject {
             referenceElapsedTime = nil
             playbackRate = 0
             refreshActiveAudioSources()
+            refreshAvailableAudioSources()
             return
         }
 
         let reportedPlaying = payload.isPlaying ?? ((payload.playbackRate ?? 0) > 0)
+        if let identifier = payload.bundleIdentifier {
+            audioSourceMonitor.rememberMediaSource(
+                processID: payload.PID ?? 0,
+                bundleIdentifier: identifier,
+                applicationName: payload.applicationName?.nonEmpty ?? sourceName(for: identifier)
+            )
+        }
         if let identifier = payload.bundleIdentifier,
            excludedApps.bundleIdentifiers.contains(identifier) {
             if adoptRunningAudioSourceIfNeeded(excluding: identifier) { return }
@@ -235,6 +283,7 @@ final class PlaybackController: ObservableObject {
         referenceDate = Date()
         playbackRate = reportedPlaying ? (payload.playbackRate ?? 1) : 0
         refreshActiveAudioSources(processID: payload.PID)
+        refreshAvailableAudioSources()
         refreshDisplayedProgress()
     }
 
@@ -279,6 +328,7 @@ final class PlaybackController: ObservableObject {
         playbackRate = 1
         pendingPlaybackState = nil
         refreshActiveAudioSources(processID: source.processID)
+        refreshAvailableAudioSources()
         return true
     }
 
@@ -308,6 +358,30 @@ final class PlaybackController: ObservableObject {
         }
     }
 
+    private func refreshAvailableAudioSources() {
+        var sources = detectedProcessSources.filter {
+            !excludedApps.bundleIdentifiers.contains($0.bundleIdentifier)
+        }
+        if hasActiveSession,
+           let bundleIdentifier,
+           !excludedApps.bundleIdentifiers.contains(bundleIdentifier),
+           !sources.contains(where: { $0.bundleIdentifier == bundleIdentifier }) {
+            sources.append(ActiveAudioSource(
+                processID: 0,
+                bundleIdentifier: bundleIdentifier,
+                applicationName: applicationName,
+                isRunningOutput: detectedAudioSources.contains { $0.bundleIdentifier == bundleIdentifier }
+            ))
+        }
+        sources.sort { left, right in
+            if left.isRunningOutput != right.isRunningOutput { return left.isRunningOutput }
+            return left.applicationName.localizedStandardCompare(right.applicationName) == .orderedAscending
+        }
+        if sources != availableAudioSources {
+            availableAudioSources = sources
+        }
+    }
+
     private func clearDisplayedSource() {
         applicationName = "未在播放"
         bundleIdentifier = nil
@@ -322,6 +396,7 @@ final class PlaybackController: ObservableObject {
         playbackRate = 0
         pendingPlaybackState = nil
         refreshActiveAudioSources()
+        refreshAvailableAudioSources()
     }
 
     private func sourceName(for bundleIdentifier: String?) -> String {

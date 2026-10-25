@@ -6,6 +6,7 @@ import SwiftUI
 @MainActor
 final class StatusBarControlView: NSView, NSPopoverDelegate {
     private let playback: PlaybackController
+    private let subtitles: CosmosSubtitleMonitor
     private let onOpenCueto: () -> Void
     private let onQuit: () -> Void
     private var observations = Set<AnyCancellable>()
@@ -34,10 +35,12 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
 
     init(
         playback: PlaybackController,
+        subtitles: CosmosSubtitleMonitor,
         onOpenCueto: @escaping () -> Void,
         onQuit: @escaping () -> Void
     ) {
         self.playback = playback
+        self.subtitles = subtitles
         self.onOpenCueto = onOpenCueto
         self.onQuit = onQuit
         super.init(frame: .zero)
@@ -289,6 +292,7 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
             contentViewController = NSHostingController(
                 rootView: NowPlayingPopover(
                     playback: playback,
+                    subtitles: subtitles,
                     onOpenCueto: openAction,
                     onQuit: quitAction
                 )
@@ -297,6 +301,7 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
         } else {
             contentViewController = NSHostingController(
                 rootView: IdlePopover(
+                    playback: playback,
                     onOpenCueto: openAction,
                     onQuit: quitAction
                 )

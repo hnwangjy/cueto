@@ -87,8 +87,10 @@ final class CuetoSettingsModel: ObservableObject {
 }
 
 struct CuetoSettingsView: View {
+    @AppStorage("openPanelAtNotch") private var openPanelAtNotch = true
     @ObservedObject var model: CuetoSettingsModel
     @ObservedObject var excludedApps: ExcludedAudioApps
+    @ObservedObject var subtitles: CosmosSubtitleMonitor
     @State private var runningApps: [NSRunningApplication] = []
 
     private var appChoices: [(identifier: String, name: String)] {
@@ -109,32 +111,27 @@ struct CuetoSettingsView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        ScrollView {
+        VStack(alignment: .leading, spacing: 20) {
             HStack(spacing: 14) {
                 if let icon = NSApplication.shared.applicationIconImage {
                     Image(nsImage: icon)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 56, height: 56)
+                        .frame(width: 48, height: 48)
                 }
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text("Cueto")
                         .font(.system(size: 22, weight: .semibold))
-                    Text("让正在播放的声音始终触手可及")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                    Text(versionText)
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
                 }
             }
 
+            sectionHeading("通用")
             VStack(spacing: 0) {
                 settingRow(
                     icon: "power",
-                    title: "登录时自动启动",
-                    detail: "登录 Mac 后自动在菜单栏运行 Cueto"
+                    title: "登录时自动启动"
                 ) {
                     Toggle("", isOn: Binding(
                         get: { model.launchAtLogin },
@@ -148,8 +145,7 @@ struct CuetoSettingsView: View {
 
                 settingRow(
                     icon: "arrow.triangle.2.circlepath",
-                    title: "自动检查更新",
-                    detail: "定期在后台检查是否有新版本"
+                    title: "自动检查更新"
                 ) {
                     Toggle("", isOn: Binding(
                         get: { model.automaticallyChecksForUpdates },
@@ -158,8 +154,71 @@ struct CuetoSettingsView: View {
                     .labelsHidden()
                     .toggleStyle(.switch)
                 }
+
             }
-            .background(.quaternary.opacity(0.55), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+            sectionHeading("实验功能", experimental: true)
+            VStack(alignment: .leading, spacing: 0) {
+                settingRow(
+                    icon: "captions.bubble",
+                    title: "菜单栏字幕 · 小宇宙"
+                ) {
+                    Toggle("", isOn: $subtitles.isEnabled)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                }
+
+                Text("跨桌面时字幕可能停止更新。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 12)
+
+                if subtitles.isEnabled && subtitles.currentText == nil {
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: subtitles.needsPermission ? "lock.circle" : "info.circle")
+                        Text(subtitles.statusMessage)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                        if subtitles.needsPermission {
+                            Button("授权…", action: subtitles.requestPermission)
+                                .controlSize(.small)
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(12)
+                    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 12)
+                }
+
+                if let text = subtitles.currentText {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(text).font(.system(size: 13)).lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(12)
+                    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 12)
+                }
+
+                Divider().padding(.leading, 44)
+                settingRow(
+                    icon: "macbook",
+                    title: "灵动岛面板"
+                ) {
+                    Toggle("", isOn: $openPanelAtNotch)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .help("悬停 MacBook 刘海展开，移开后收起")
+                }
+            }
+            .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
             VStack(alignment: .leading, spacing: 9) {
                 HStack {
@@ -169,9 +228,6 @@ struct CuetoSettingsView: View {
                     Button("添加应用…", action: chooseApplication)
                         .controlSize(.small)
                 }
-                Text("勾选后，该应用不会出现在控制栏、数量角标或播放来源列表中。")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
 
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
@@ -221,7 +277,7 @@ struct CuetoSettingsView: View {
             }
 
             HStack {
-                Text("更新检查由 Sparkle 安全执行")
+                Text(versionText)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
@@ -230,12 +286,30 @@ struct CuetoSettingsView: View {
                     .keyboardShortcut("u", modifiers: [.command])
             }
         }
-        .padding(26)
-        .frame(minWidth: 440, minHeight: 500)
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(minWidth: 440, minHeight: 520)
         .onAppear {
             model.refresh()
             runningApps = NSWorkspace.shared.runningApplications
         }
+    }
+
+    private func sectionHeading(_ title: String, experimental: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 7) {
+                Text(title).font(.system(size: 13, weight: .semibold))
+                if experimental {
+                    Text("BETA")
+                        .font(.system(size: 9, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(Color.accentColor.opacity(0.12), in: Capsule())
+                }
+            }
+        }
+        .padding(.horizontal, 2)
     }
 
     private func chooseApplication() {
@@ -257,7 +331,7 @@ struct CuetoSettingsView: View {
     private func settingRow<Accessory: View>(
         icon: String,
         title: String,
-        detail: String,
+        detail: String? = nil,
         @ViewBuilder accessory: () -> Accessory
     ) -> some View {
         HStack(spacing: 12) {
@@ -270,9 +344,12 @@ struct CuetoSettingsView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 13, weight: .medium))
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if let detail {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             Spacer()

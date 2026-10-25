@@ -7,6 +7,19 @@ struct ActiveAudioSource: Identifiable, Equatable {
     let processID: pid_t
     let bundleIdentifier: String
     let applicationName: String
+    let isRunningOutput: Bool
+
+    init(
+        processID: pid_t,
+        bundleIdentifier: String,
+        applicationName: String,
+        isRunningOutput: Bool = true
+    ) {
+        self.processID = processID
+        self.bundleIdentifier = bundleIdentifier
+        self.applicationName = applicationName
+        self.isRunningOutput = isRunningOutput
+    }
 
     var id: String { bundleIdentifier }
 
@@ -23,8 +36,10 @@ struct ActiveAudioSource: Identifiable, Equatable {
 @MainActor
 final class ActiveAudioSourceMonitor: ObservableObject {
     @Published private(set) var sources: [ActiveAudioSource] = []
+    @Published private(set) var processSources: [ActiveAudioSource] = []
 
     private var refreshTimer: AnyCancellable?
+    private var observedSources: [String: ActiveAudioSource] = [:]
 
     init() {
         refresh()
@@ -34,13 +49,57 @@ final class ActiveAudioSourceMonitor: ObservableObject {
     }
 
     private func refresh() {
-        let discovered = Self.runningOutputSources()
-        if discovered != sources {
-            sources = discovered
+        let discovered = Self.audioProcessSources()
+        for source in discovered {
+            observedSources[source.bundleIdentifier] = source
+        }
+        observedSources = observedSources.filter { _, source in
+            NSRunningApplication(processIdentifier: source.processID)?.bundleIdentifier == source.bundleIdentifier
+        }
+
+        let active = discovered.filter(\.isRunningOutput)
+        if active != sources {
+            sources = active
+        }
+        let available = observedSources.values.map { source in
+            discovered.first(where: { $0.bundleIdentifier == source.bundleIdentifier })
+                ?? ActiveAudioSource(
+                    processID: source.processID,
+                    bundleIdentifier: source.bundleIdentifier,
+                    applicationName: source.applicationName,
+                    isRunningOutput: false
+                )
+        }.sorted {
+            if $0.isRunningOutput != $1.isRunningOutput { return $0.isRunningOutput }
+            return $0.applicationName.localizedStandardCompare($1.applicationName) == .orderedAscending
+        }
+        if available != processSources {
+            processSources = available
         }
     }
 
-    private static func runningOutputSources() -> [ActiveAudioSource] {
+    func rememberMediaSource(processID: pid_t, bundleIdentifier: String, applicationName: String) {
+        let resolvedProcessID = processID > 0 ? processID : NSWorkspace.shared.runningApplications
+            .first(where: { $0.bundleIdentifier == bundleIdentifier })?.processIdentifier ?? 0
+        guard resolvedProcessID > 0,
+              NSRunningApplication(processIdentifier: resolvedProcessID)?.bundleIdentifier == bundleIdentifier else {
+            return
+        }
+        if let existing = observedSources[bundleIdentifier],
+           existing.processID == resolvedProcessID,
+           existing.applicationName == applicationName {
+            return
+        }
+        observedSources[bundleIdentifier] = ActiveAudioSource(
+            processID: resolvedProcessID,
+            bundleIdentifier: bundleIdentifier,
+            applicationName: applicationName,
+            isRunningOutput: false
+        )
+        refresh()
+    }
+
+    private static func audioProcessSources() -> [ActiveAudioSource] {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyProcessObjectList,
             mScope: kAudioObjectPropertyScopeGlobal,
@@ -73,7 +132,7 @@ final class ActiveAudioSourceMonitor: ObservableObject {
         }
 
         var sourcesByBundleIdentifier: [String: ActiveAudioSource] = [:]
-        for processObject in processObjects where isRunningOutput(processObject) {
+        for processObject in processObjects {
             guard let processID = property(processObject, selector: kAudioProcessPropertyPID, as: pid_t.self),
                   processID != ProcessInfo.processInfo.processIdentifier,
                   let runningApplication = NSRunningApplication(processIdentifier: processID),
@@ -85,11 +144,15 @@ final class ActiveAudioSourceMonitor: ObservableObject {
 
             let applicationName = runningApplication.localizedName
                 ?? applicationDisplayName(bundleIdentifier: bundleIdentifier)
-            sourcesByBundleIdentifier[bundleIdentifier] = ActiveAudioSource(
+            let source = ActiveAudioSource(
                 processID: processID,
                 bundleIdentifier: bundleIdentifier,
-                applicationName: applicationName
+                applicationName: applicationName,
+                isRunningOutput: isRunningOutput(processObject)
             )
+            if source.isRunningOutput || sourcesByBundleIdentifier[bundleIdentifier] == nil {
+                sourcesByBundleIdentifier[bundleIdentifier] = source
+            }
         }
 
         return sourcesByBundleIdentifier.values.sorted {
