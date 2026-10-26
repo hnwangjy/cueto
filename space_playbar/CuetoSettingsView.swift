@@ -176,6 +176,23 @@ struct CuetoSettingsView: View {
                     .padding(.horizontal, 14)
                     .padding(.bottom, 12)
 
+                if subtitles.isEnabled {
+                    HStack(spacing: 16) {
+                        Text("字幕宽度").font(.system(size: 12))
+                        Spacer(minLength: 0)
+                        Picker("字幕宽度", selection: $subtitles.width) {
+                            ForEach(SubtitleWidth.allCases, id: \.self) { width in
+                                Text(width.title).tag(width)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .frame(width: 180)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 12)
+                }
+
                 if subtitles.isEnabled && subtitles.currentText == nil {
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: subtitles.needsPermission ? "lock.circle" : "info.circle")

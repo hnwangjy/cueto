@@ -3,10 +3,33 @@ import AppKit
 import ApplicationServices
 import Combine
 
+enum SubtitleWidth: String, CaseIterable {
+    case short, medium, long
+
+    var title: String {
+        switch self {
+        case .short: return "短"
+        case .medium: return "适中"
+        case .long: return "长"
+        }
+    }
+
+    var points: CGFloat {
+        switch self {
+        case .short: return 180
+        case .medium: return 240
+        case .long: return 320
+        }
+    }
+}
+
 /// Reads the caption region observed in Xiaoyuzhou's playback page.
 /// Never navigates, clicks, captures audio, or reads another application's UI.
 @MainActor
 final class CosmosSubtitleMonitor: ObservableObject {
+    @Published var width: SubtitleWidth {
+        didSet { UserDefaults.standard.set(width.rawValue, forKey: "subtitleWidth") }
+    }
     @Published var isEnabled: Bool {
         didSet {
             UserDefaults.standard.set(isEnabled, forKey: "showCosmosSubtitles")
@@ -27,6 +50,7 @@ final class CosmosSubtitleMonitor: ObservableObject {
     private let windowCache = CaptionWindowCache()
 
     init() {
+        width = SubtitleWidth(rawValue: UserDefaults.standard.string(forKey: "subtitleWidth") ?? "") ?? .medium
         isEnabled = UserDefaults.standard.bool(forKey: "showCosmosSubtitles")
         configureTimer()
         refresh()

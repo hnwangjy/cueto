@@ -54,8 +54,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.statusControlView = controlView
         self.statusItem = item
         subtitles.$currentText
+            .combineLatest(subtitles.$width)
             .receive(on: RunLoop.main)
-            .sink { [weak self] text in self?.updateSubtitleItem(text) }
+            .sink { [weak self] text, width in self?.updateSubtitleItem(text, width: width.points) }
             .store(in: &subtitleObservations)
         statusItemObservation = playback.$applicationName
             .combineLatest(playback.$hasActiveSession, playback.$activeAudioSources)
@@ -70,7 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
     }
 
-    private func updateSubtitleItem(_ text: String?) {
+    private func updateSubtitleItem(_ text: String?, width: CGFloat) {
         guard let text, !text.isEmpty else {
             if let item = subtitleStatusItem { NSStatusBar.system.removeStatusItem(item) }
             subtitleStatusItem = nil
@@ -80,17 +81,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let existing = subtitleStatusItem {
             item = existing
         } else {
-            item = NSStatusBar.system.statusItem(withLength: 260)
-            item.button?.font = NSFont.systemFont(ofSize: 12, weight: .medium)
-            item.button?.alignment = .left
-            item.button?.cell?.lineBreakMode = .byTruncatingTail
-            item.button?.target = self
-            item.button?.action = #selector(openSubtitleSettings)
+            item = NSStatusBar.system.statusItem(withLength: width)
+            let view = SubtitleStatusView(frame: NSRect(x: 0, y: 0, width: width, height: NSStatusBar.system.thickness))
+            view.target = self
+            view.action = #selector(openSubtitleSettings)
+            item.view = view
             subtitleStatusItem = item
         }
-        item.button?.title = text
-        item.button?.toolTip = text + "\n点击打开 Cueto 设置"
-        item.button?.setAccessibilityLabel("小宇宙字幕：\(text)")
+        item.length = width
+        item.view?.setFrameSize(NSSize(width: width, height: NSStatusBar.system.thickness))
+        (item.view as? SubtitleStatusView)?.show(text)
     }
 
     @objc private func openSubtitleSettings() { openCueto() }

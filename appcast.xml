@@ -3,6 +3,32 @@
     <channel>
         <title>Cueto</title>
         <item>
+            <title>1.2.1</title>
+            <pubDate>Tue, 27 Oct 2026 00:18:00 +0800</pubDate>
+            <link>https://github.com/hnwangjy/cueto</link>
+            <sparkle:version>13</sparkle:version>
+            <sparkle:shortVersionString>1.2.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.7</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Cueto 1.2.1
+
+## 字幕优化
+
+- 新增“短／适中／长”三档字幕宽度，默认适中；短句居中显示，选择自动保存。
+- 换句加入轻微上移和淡化过渡，长句向左滚动至句尾后停住，不再循环重播。
+- 切换宽度保留阅读位置，同一句补字不从头重播。
+- 缩短滚动起步等待，优化短档的滚动速度。
+- 新句立即切换，修复菜单栏字幕落后于面板的问题。
+- 尊重系统“减少动态效果”设置，关闭自动滚动并保留淡化过渡。
+
+字幕仍为实验功能，依赖小宇宙默认播放页的小字幕更新，跨桌面时可能停止刷新。
+
+## 安装说明
+
+下载并打开 DMG，将 Cueto 拖入“应用程序”。首次启动时如果 macOS 阻止打开，请在 Finder 中右键 Cueto，选择“打开”。
+]]></description>
+            <enclosure url="https://github.com/hnwangjy/cueto/releases/download/v1.2.1/Cueto-1.2.1.dmg" length="3953546" type="application/octet-stream" sparkle:edSignature="4YwQU13Kbvpomtrg9A5tfwqkAKZ8ZEQ9qmKXUmeHmdVxhd0H94S1rG2DpqsEFa7AkyEqxfWA9UI+rA7eHpRzDQ=="/>
+        </item>
+        <item>
             <title>1.2.0</title>
             <pubDate>Sun, 25 Oct 2026 22:59:05 +0800</pubDate>
             <link>https://github.com/hnwangjy/cueto</link>
