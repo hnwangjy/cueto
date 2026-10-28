@@ -49,7 +49,7 @@ Cueto 调用 macOS 的系统 Now Playing / MediaRemote 能力。菜单栏的播�
 ## 系统要求
 
 - macOS 26.7 或更高版本
-- 当前 Release 为 Apple Silicon（arm64）版本
+- 当前 Release 同时支持 Apple Silicon（arm64）和 Intel（x86_64）
 
 ## 开发
 

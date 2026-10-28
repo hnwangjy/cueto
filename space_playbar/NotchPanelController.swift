@@ -9,6 +9,7 @@ final class NotchPanelController {
     static let preferenceKey = "openPanelAtNotch"
     private let playback: PlaybackController
     private let subtitles: CosmosSubtitleMonitor
+    private let appleLyrics: AppleMusicLyricsMonitor
     private let onOpenSettings: () -> Void
     private var timer: AnyCancellable?
     private var panel: NotchPanel?
@@ -19,9 +20,10 @@ final class NotchPanelController {
     private let expansion = NotchExpansionState()
     private var pendingClose: DispatchWorkItem?
 
-    init(playback: PlaybackController, subtitles: CosmosSubtitleMonitor, onOpenSettings: @escaping () -> Void) {
+    init(playback: PlaybackController, subtitles: CosmosSubtitleMonitor, appleLyrics: AppleMusicLyricsMonitor, onOpenSettings: @escaping () -> Void) {
         self.playback = playback
         self.subtitles = subtitles
+        self.appleLyrics = appleLyrics
         self.onOpenSettings = onOpenSettings
         UserDefaults.standard.register(defaults: [Self.preferenceKey: true])
         // Sampling position needs no event interception or extra Accessibility permission.
@@ -94,7 +96,7 @@ final class NotchPanelController {
         let panel = NotchPanel(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel],
                                backing: .buffered, defer: false)
         panel.onDismiss = { [weak self] in self?.suppressed = true; self?.hide() }
-        let root = NotchPlaybackView(playback: playback, subtitles: subtitles,
+        let root = NotchPlaybackView(playback: playback, subtitles: subtitles, appleLyrics: appleLyrics,
             onOpenSettings: { [weak self] in
                 self?.suppressed = true
                 self?.hide(animated: false)
@@ -228,6 +230,7 @@ private final class NotchPanel: NSPanel {
 private struct NotchPlaybackView: View {
     @ObservedObject var playback: PlaybackController
     @ObservedObject var subtitles: CosmosSubtitleMonitor
+    @ObservedObject var appleLyrics: AppleMusicLyricsMonitor
     let onOpenSettings: () -> Void
     let onClose: () -> Void
 
@@ -249,7 +252,7 @@ private struct NotchPlaybackView: View {
                         .help(playback.forwardControlLabel)
                 }
                 .font(.system(size: 19)).buttonStyle(.borderless).padding(.top, 16)
-                NowPlayingPopover(playback: playback, subtitles: subtitles, onOpenCueto: onOpenSettings,
+                NowPlayingPopover(playback: playback, subtitles: subtitles, appleLyrics: appleLyrics, onOpenCueto: onOpenSettings,
                                   onQuit: { NSApplication.shared.terminate(nil) })
             } else {
                 IdlePopover(playback: playback, onOpenCueto: onOpenSettings,

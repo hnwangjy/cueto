@@ -2,11 +2,15 @@
 import AppKit
 import Combine
 import SwiftUI
+import OSLog
 
 @MainActor
 final class StatusBarControlView: NSView, NSPopoverDelegate {
+    var routesThroughStatusButton = false
+    private let inputLogger = Logger(subsystem: "com.wangjiayuan.cueto", category: "MenuBarInput")
     private let playback: PlaybackController
     private let subtitles: CosmosSubtitleMonitor
+    private let appleLyrics: AppleMusicLyricsMonitor
     private let onOpenCueto: () -> Void
     private let onQuit: () -> Void
     private var observations = Set<AnyCancellable>()
@@ -36,11 +40,13 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
     init(
         playback: PlaybackController,
         subtitles: CosmosSubtitleMonitor,
+        appleLyrics: AppleMusicLyricsMonitor,
         onOpenCueto: @escaping () -> Void,
         onQuit: @escaping () -> Void
     ) {
         self.playback = playback
         self.subtitles = subtitles
+        self.appleLyrics = appleLyrics
         self.onOpenCueto = onOpenCueto
         self.onQuit = onQuit
         super.init(frame: .zero)
@@ -60,6 +66,51 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool {
         true
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        // The native NSStatusBarButton is the sole pointer event receiver.
+        // Child buttons remain available for accessibility actions and drawing.
+        routesThroughStatusButton ? nil : super.hitTest(point)
+    }
+
+    func handleStatusItemEvent(_ event: NSEvent?) {
+        if let event, event.type == .rightMouseUp || event.type == .rightMouseDown {
+            inputLogger.info("native status event: context menu")
+            rightMouseDown(with: event)
+            return
+        }
+        guard let event, event.type != .keyDown, event.type != .keyUp else {
+            inputLogger.info("native status event: keyboard/source")
+            showNowPlaying()
+            return
+        }
+        layoutSubtreeIfNeeded()
+        let location: NSPoint
+        if event.window === window {
+            location = event.locationInWindow
+        } else if let window {
+            // Some status-bar hosts deliver a forwarded action whose current
+            // event belongs to a different window. Convert screen coordinates
+            // through our own host rather than using that event's local origin.
+            location = window.convertPoint(fromScreen: NSEvent.mouseLocation)
+        } else { return }
+        let point = convert(location, from: nil)
+        let target = StatusBarHitRegions.target(at: point, in: bounds, idle: isIdleState,
+            backward: backwardButton.convert(backwardButton.bounds, to: self),
+            playPause: playPauseButton.convert(playPauseButton.bounds, to: self),
+            forward: forwardButton.convert(forwardButton.bounds, to: self))
+        guard let target else {
+            inputLogger.error("native status event: no hit region")
+            return
+        }
+        inputLogger.info("native status event: \(target.rawValue, privacy: .public)")
+        switch target {
+        case .source: sourceButton.performClick(nil)
+        case .backward: backwardButton.performClick(nil)
+        case .playPause: playPauseButton.performClick(nil)
+        case .forward: forwardButton.performClick(nil)
+        }
     }
 
     override var allowsVibrancy: Bool {
@@ -293,6 +344,7 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
                 rootView: NowPlayingPopover(
                     playback: playback,
                     subtitles: subtitles,
+                    appleLyrics: appleLyrics,
                     onOpenCueto: openAction,
                     onQuit: quitAction
                 )
@@ -351,6 +403,8 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
 }
 
 private final class StatusBarNativeButton: NSButton {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
     static let idleSourceIdentifier = "com.wangjiayuan.cueto.idle"
 
     private struct SourcePresentation {

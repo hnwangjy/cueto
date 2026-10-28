@@ -8,7 +8,7 @@ final class SubtitleStatusView: NSButton {
     private var currentText = ""
     private var textContainer: CALayer?
     private var primaryText: CATextLayer?
-    private let textFont = NSFont.systemFont(ofSize: 12, weight: .medium)
+    private let textFont = NSFont.systemFont(ofSize: 13, weight: .medium)
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -16,7 +16,7 @@ final class SubtitleStatusView: NSButton {
         isBordered = false
         wantsLayer = true
         layer?.masksToBounds = true
-        setAccessibilityLabel("小宇宙字幕")
+        setAccessibilityLabel("当前字幕或歌词")
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
@@ -67,6 +67,11 @@ final class SubtitleStatusView: NSButton {
         }
     }
 
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        render(transition: false, offset: readingOffset)
+    }
+
     private func render(transition: Bool, offset: CGFloat = 0) {
         guard let layer, !currentText.isEmpty else { return }
         let reduced = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
@@ -79,16 +84,18 @@ final class SubtitleStatusView: NSButton {
         let viewport = container.bounds.width
         let width = ceil((currentText as NSString).size(withAttributes: [.font: textFont]).width) + 2
         let overflow = width > viewport
-        let height = ceil(textFont.ascender - textFont.descender + 2)
-
         func makeText(x: CGFloat) -> CATextLayer {
             let text = CATextLayer()
             text.contentsScale = window?.backingScaleFactor ?? 2
             text.string = NSAttributedString(string: currentText, attributes: [
                 .font: textFont, .foregroundColor: NSColor.white
             ])
-            text.frame = CGRect(x: x, y: floor((bounds.height - height) / 2),
-                                width: reduced ? min(width, viewport) : width, height: height)
+            // CATextLayer handles AppKit's flipped backing coordinates itself.
+            // Keep its native drawing and compensate its top inset in placement.
+            let height = ceil(textFont.ascender - textFont.descender + 2)
+            let scale = text.contentsScale
+            let y = (((container.bounds.height - height) / 2 + 1) * scale).rounded() / scale
+            text.frame = CGRect(x: x, y: y, width: reduced ? min(width, viewport) : width, height: height)
             text.truncationMode = reduced ? .end : .none
             return text
         }

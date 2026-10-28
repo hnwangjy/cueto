@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let excludedApps = ExcludedAudioApps()
     private lazy var playback = PlaybackController(excludedApps: excludedApps)
     private let subtitles = CosmosSubtitleMonitor()
+    private let appleLyrics = AppleMusicLyricsMonitor()
     private var subtitleStatusItem: NSStatusItem?
     private var subtitleObservations = Set<AnyCancellable>()
     private var statusItem: NSStatusItem?
@@ -26,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(.accessory)
         _ = updaterController
-        notchPanelController = NotchPanelController(playback: playback, subtitles: subtitles) { [weak self] in
+        notchPanelController = NotchPanelController(playback: playback, subtitles: subtitles, appleLyrics: appleLyrics) { [weak self] in
             self?.openCueto()
         }
 
@@ -40,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let controlView = StatusBarControlView(
             playback: playback,
             subtitles: subtitles,
+            appleLyrics: appleLyrics,
             onOpenCueto: { [weak self] in self?.openCueto() },
             onQuit: { NSApplication.shared.terminate(nil) }
         )
@@ -49,14 +51,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             width: item.length,
             height: NSStatusBar.system.thickness
         )
-        item.view = controlView
+        if let button = item.button {
+            button.title = ""
+            button.image = nil
+            button.target = self
+            button.action = #selector(statusItemActivated(_:))
+            button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+            (button.cell as? NSButtonCell)?.highlightsBy = []
+            controlView.routesThroughStatusButton = true
+            controlView.autoresizingMask = [.width, .height]
+            controlView.frame = button.bounds
+            button.addSubview(controlView)
+            button.setAccessibilityLabel("Cueto 播放控制")
+        }
 
         self.statusControlView = controlView
         self.statusItem = item
         subtitles.$currentText
-            .combineLatest(subtitles.$width)
+            .combineLatest(appleLyrics.$currentText, subtitles.$width)
+            .combineLatest(appleLyrics.$isPlaying, playback.$bundleIdentifier)
             .receive(on: RunLoop.main)
-            .sink { [weak self] text, width in self?.updateSubtitleItem(text, width: width.points) }
+            .sink { [weak self] values, playing, source in
+                self?.updateSubtitleItem(self?.appleLyrics.isEnabled == true && (playing || source == "com.apple.Music") ? values.1 : values.0, width: values.2.points)
+            }
             .store(in: &subtitleObservations)
         statusItemObservation = playback.$applicationName
             .combineLatest(playback.$hasActiveSession, playback.$activeAudioSources)
@@ -69,6 +86,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 item?.length = length
                 controlView?.frame.size.width = length
             }
+    }
+
+    @objc private func statusItemActivated(_ sender: NSStatusBarButton) {
+        statusControlView?.handleStatusItemEvent(NSApp.currentEvent)
     }
 
     private func updateSubtitleItem(_ text: String?, width: CGFloat) {
@@ -121,7 +142,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             windowController = existingWindowController
         } else {
             model = CuetoSettingsModel(updater: updaterController.updater)
-            let rootView = CuetoSettingsView(model: model, excludedApps: excludedApps, subtitles: subtitles)
+            let rootView = CuetoSettingsView(model: model, excludedApps: excludedApps, subtitles: subtitles, appleLyrics: appleLyrics)
             let window = NSWindow(contentViewController: NSHostingController(rootView: rootView))
             window.title = "Cueto"
             window.styleMask = [.titled, .closable, .miniaturizable]

@@ -91,6 +91,7 @@ struct CuetoSettingsView: View {
     @ObservedObject var model: CuetoSettingsModel
     @ObservedObject var excludedApps: ExcludedAudioApps
     @ObservedObject var subtitles: CosmosSubtitleMonitor
+    @ObservedObject var appleLyrics: AppleMusicLyricsMonitor
     @State private var runningApps: [NSRunningApplication] = []
 
     private var appChoices: [(identifier: String, name: String)] {
@@ -176,7 +177,7 @@ struct CuetoSettingsView: View {
                     .padding(.horizontal, 14)
                     .padding(.bottom, 12)
 
-                if subtitles.isEnabled {
+                if subtitles.isEnabled || appleLyrics.isEnabled {
                     HStack(spacing: 16) {
                         Text("字幕宽度").font(.system(size: 12))
                         Spacer(minLength: 0)
@@ -225,6 +226,36 @@ struct CuetoSettingsView: View {
                 }
 
                 Divider().padding(.leading, 44)
+#if CUETO_APPLE_MUSIC_LYRICS
+                settingRow(icon: "music.note", title: "Apple Music 歌词") {
+                    Toggle("", isOn: $appleLyrics.isEnabled)
+                        .labelsHidden().toggleStyle(.switch)
+                }
+                if appleLyrics.isEnabled {
+                    HStack {
+                        Spacer()
+                        Button("连接 Apple Music…", action: appleLyrics.openDirectProbe)
+                            .controlSize(.small)
+                    }.padding(.horizontal, 14).padding(.bottom, 8)
+                    Text(appleLyrics.usesDirectLyrics ? "通过 Apple Music 登录会话直接获取歌词。" : "歌曲信息发送至 LRCLIB，歌词缓存在本机。")
+                        .font(.caption).foregroundStyle(.secondary)
+                        .padding(.horizontal, 14).padding(.bottom, 12)
+                    if let text = appleLyrics.currentText {
+                        Text(text).font(.system(size: 13)).lineLimit(3)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12).background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+                            .padding(.horizontal, 14).padding(.bottom, 12)
+                    } else if !appleLyrics.statusMessage.isEmpty {
+                        HStack {
+                            Text(appleLyrics.statusMessage).font(.caption).foregroundStyle(.secondary)
+                            Spacer()
+                            Button(appleLyrics.needsPermission ? "授权…" : "重试", action: appleLyrics.retry)
+                                .controlSize(.small)
+                        }.padding(.horizontal, 14).padding(.bottom, 12)
+                    }
+                }
+                Divider().padding(.leading, 44)
+#endif
                 settingRow(
                     icon: "macbook",
                     title: "灵动岛面板"

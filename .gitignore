@@ -1,2 +1,15 @@
 dist/
 *.xcarchive
+**/xcuserdata/
+*.xcuserstate
+.DS_Store
+.env
+.env.*
+!.env.example
+*.p8
+*.p12
+*.binarycookies
+**/WebKit/
+**/Cookies/
+*applemusic-token*.json
+*apple-music-token*.json

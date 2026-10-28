@@ -47,6 +47,7 @@ struct IdlePopover: View {
 struct NowPlayingPopover: View {
     @ObservedObject var playback: PlaybackController
     @ObservedObject var subtitles: CosmosSubtitleMonitor
+    @ObservedObject var appleLyrics: AppleMusicLyricsMonitor
     let onOpenCueto: () -> Void
     let onQuit: () -> Void
     @Environment(\.dismiss) private var dismiss
@@ -95,9 +96,9 @@ struct NowPlayingPopover: View {
                 playbackProgress(elapsedTime: elapsedTime, duration: duration)
             }
 
-            if let text = subtitles.currentText {
+            if let text = appleLyrics.isEnabled && (appleLyrics.isPlaying || playback.bundleIdentifier == "com.apple.Music") ? appleLyrics.currentText : subtitles.currentText {
                 VStack(alignment: .leading, spacing: 6) {
-                    Label("小宇宙字幕", systemImage: "captions.bubble")
+                    Label(appleLyrics.isEnabled && (appleLyrics.isPlaying || playback.bundleIdentifier == "com.apple.Music") ? "Apple Music 歌词" : "小宇宙字幕", systemImage: "captions.bubble")
                         .font(.caption).foregroundStyle(.secondary)
                     Text(text).font(.system(size: 13)).fixedSize(horizontal: false, vertical: true)
                 }
@@ -253,7 +254,10 @@ struct AudioProcessList: View {
         if source.bundleIdentifier == playback.bundleIdentifier && playback.hasActiveSession {
             return playback.isPlaying ? "当前播放" : "已暂停"
         }
-        return source.isRunningOutput ? "正在输出" : "未输出音频"
+        if playback.activeAudioSources.contains(where: { $0.bundleIdentifier == source.bundleIdentifier }) {
+            return "正在播放"
+        }
+        return source.isRunningOutput ? "音频流活跃" : "未输出音频"
     }
 }
 
