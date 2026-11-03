@@ -3,6 +3,23 @@
     <channel>
         <title>Cueto</title>
         <item>
+            <title>1.2.3</title>
+            <pubDate>Tue, 03 Nov 2026 18:02:03 +0800</pubDate>
+            <link>https://github.com/hnwangjy/cueto</link>
+            <sparkle:version>15</sparkle:version>
+            <sparkle:shortVersionString>1.2.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.7</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Cueto 1.2.3
+
+- 修复 macOS 27.2 上点击菜单栏右侧播放控制按钮时误打开面板的问题。
+
+## 安装说明
+
+下载并打开 DMG，将 Cueto 拖入“应用程序”。已安装 Cueto 的用户也可以在设置中检查更新。
+]]></description>
+            <enclosure url="https://github.com/hnwangjy/cueto/releases/download/v1.2.3/Cueto-1.2.3.dmg" type="application/octet-stream" sparkle:edSignature="YS6VUkZth3bsDiAjSbYhp7SYynN015E3RUb9AlfsreZyUZ/EedO3qexgjGpSWo/v+Giez59u1emBWislXawEBg==" length="4376952"/>
+        </item>
+        <item>
             <title>1.2.2</title>
             <pubDate>Wed, 28 Oct 2026 11:40:45 +0800</pubDate>
             <link>https://github.com/hnwangjy/cueto</link>

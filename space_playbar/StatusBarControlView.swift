@@ -86,15 +86,10 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
             return
         }
         layoutSubtreeIfNeeded()
-        let location: NSPoint
-        if event.window === window {
-            location = event.locationInWindow
-        } else if let window {
-            // Some status-bar hosts deliver a forwarded action whose current
-            // event belongs to a different window. Convert screen coordinates
-            // through our own host rather than using that event's local origin.
-            location = window.convertPoint(fromScreen: NSEvent.mouseLocation)
-        } else { return }
+        guard let window else { return }
+        // The native status item can forward an event with a window-local
+        // position at the source region, even when its window matches ours.
+        let location = window.convertPoint(fromScreen: NSEvent.mouseLocation)
         let point = convert(location, from: nil)
         let target = StatusBarHitRegions.target(at: point, in: bounds, idle: isIdleState,
             backward: backwardButton.convert(backwardButton.bounds, to: self),
