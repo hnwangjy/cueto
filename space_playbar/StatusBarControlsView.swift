@@ -18,7 +18,7 @@ struct IdlePopover: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Cueto")
                         .font(.headline)
-                    Text("当前没有音频正在播放")
+                    Text(String(localized: "当前没有音频正在播放"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -31,9 +31,9 @@ struct IdlePopover: View {
             Divider()
 
             HStack {
-                Button("打开 Cueto", action: onOpenCueto)
+                Button(String(localized: "打开 Cueto"), action: onOpenCueto)
                 Spacer()
-                Button("退出", action: onQuit)
+                Button(String(localized: "退出"), action: onQuit)
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
@@ -70,7 +70,7 @@ struct NowPlayingPopover: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(playback.applicationName)
                         .font(.headline)
-                    Text(playback.isPlaying ? "正在播放" : "已暂停")
+                    Text(playback.isPlaying ? String(localized: "正在播放") : String(localized: "已暂停"))
                         .font(.caption)
                         .foregroundStyle(playback.isPlaying ? Color.accentColor : .secondary)
                 }
@@ -101,9 +101,9 @@ struct NowPlayingPopover: View {
             let text = showsAppleLyrics ? appleLyrics.currentText : subtitles.currentText
             if showsAppleLyrics || text != nil {
                 VStack(alignment: .leading, spacing: 6) {
-                    Label(showsAppleLyrics ? "Apple Music 歌词" : "小宇宙字幕", systemImage: "captions.bubble")
+                    Label(showsAppleLyrics ? String(localized: "Apple Music 歌词") : String(localized: "小宇宙字幕"), systemImage: "captions.bubble")
                         .font(.caption).foregroundStyle(.secondary)
-                    Text(text ?? (appleLyrics.showsMissingLyrics ? "未读取到歌词" : ""))
+                    Text(text ?? (appleLyrics.showsMissingLyrics ? String(localized: "未读取到歌词") : ""))
                         .font(.system(size: 13))
                         .foregroundStyle(text == nil ? .secondary : .primary)
                         .lineLimit(2, reservesSpace: true)
@@ -116,14 +116,14 @@ struct NowPlayingPopover: View {
             Divider()
 
             HStack {
-                Button("打开 Cueto") {
+                Button(String(localized: "打开 Cueto")) {
                     dismiss()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                         onOpenCueto()
                     }
                 }
                 Spacer()
-                Button("退出", action: onQuit)
+                Button(String(localized: "退出"), action: onQuit)
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
@@ -141,19 +141,19 @@ struct NowPlayingPopover: View {
             ProgressView(value: elapsed, total: duration)
                 .progressViewStyle(.linear)
                 .tint(.accentColor)
-                .accessibilityLabel("播放进度")
-                .accessibilityValue("已播放 \(formatTime(elapsed))，总时长 \(formatTime(duration))")
+                .accessibilityLabel(String(localized: "播放进度"))
+                .accessibilityValue(String(localized: "已播放 \(formatTime(elapsed))，总时长 \(formatTime(duration))"))
 
             HStack(spacing: 8) {
                 Text(formatTime(elapsed))
-                    .accessibilityLabel("已播放 \(formatTime(elapsed))")
+                    .accessibilityLabel(String(localized: "已播放 \(formatTime(elapsed))"))
                 Spacer()
-                Text("共 \(formatTime(duration))")
+                Text(String(localized: "共 \(formatTime(duration))"))
                     .foregroundStyle(.secondary)
-                    .accessibilityLabel("总时长 \(formatTime(duration))")
+                    .accessibilityLabel(String(localized: "总时长 \(formatTime(duration))"))
                 Spacer()
                 Text("−\(formatTime(remaining))")
-                    .accessibilityLabel("剩余 \(formatTime(remaining))")
+                    .accessibilityLabel(String(localized: "剩余 \(formatTime(remaining))"))
             }
             .font(.system(size: 10, weight: .medium, design: .monospaced))
             .foregroundStyle(.secondary)
@@ -179,10 +179,10 @@ struct AudioProcessList: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("音频应用")
+                Text(String(localized: "音频应用"))
                     .font(.system(size: 11, weight: .semibold))
                 Spacer()
-                Text("\(playback.availableAudioSources.count) 个")
+                Text(String(localized: "\(playback.availableAudioSources.count) 个"))
                     .font(.system(size: 10, weight: .medium))
                     .monospacedDigit()
             }
@@ -209,7 +209,7 @@ struct AudioProcessList: View {
                                         Image(systemName: "checkmark.circle.fill")
                                             .font(.system(size: 10))
                                             .foregroundStyle(Color.accentColor)
-                                            .accessibilityLabel("当前来源")
+                                            .accessibilityLabel(String(localized: "当前来源"))
                                     }
                                 }
                                 Text(statusText(for: source))
@@ -224,14 +224,14 @@ struct AudioProcessList: View {
                                 }
                             } label: {
                                 HStack(spacing: 5) {
-                                    Text("前往")
+                                    Text(String(localized: "前往"))
                                     Image(systemName: "arrow.right")
                                         .font(.system(size: 9, weight: .semibold))
                                 }
                             }
                             .buttonStyle(SourceNavigationButtonStyle())
-                            .help("打开并切换到 \(source.applicationName)")
-                            .accessibilityLabel("前往 \(source.applicationName)")
+                            .help(String(localized: "打开并切换到 \(source.applicationName)"))
+                            .accessibilityLabel(String(localized: "前往 \(source.applicationName)"))
                         }
                         .disabled(playback.openingSourceIdentifier != nil)
                         .padding(.horizontal, 8)
@@ -258,12 +258,12 @@ struct AudioProcessList: View {
 
     private func statusText(for source: ActiveAudioSource) -> String {
         if source.bundleIdentifier == playback.bundleIdentifier && playback.hasActiveSession {
-            return playback.isPlaying ? "当前播放" : "已暂停"
+            return playback.isPlaying ? String(localized: "当前播放") : String(localized: "已暂停")
         }
         if playback.activeAudioSources.contains(where: { $0.bundleIdentifier == source.bundleIdentifier }) {
-            return "正在播放"
+            return String(localized: "正在播放")
         }
-        return source.isRunningOutput ? "音频流活跃" : "未输出音频"
+        return source.isRunningOutput ? String(localized: "音频流活跃") : String(localized: "未输出音频")
     }
 }
 

@@ -10,7 +10,7 @@ final class PlaybackController: ObservableObject {
         case trackNavigation
     }
 
-    @Published private(set) var applicationName = "未在播放"
+    @Published private(set) var applicationName = String(localized: "未在播放")
     @Published private(set) var bundleIdentifier: String?
     @Published private(set) var title: String?
     @Published private(set) var artist: String?
@@ -33,7 +33,7 @@ final class PlaybackController: ObservableObject {
         }
         guard let url = runningApp?.bundleURL
                 ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier: source.bundleIdentifier) else {
-            sourceOpenError = "找不到 \(source.applicationName)，应用可能已被移除。"
+            sourceOpenError = String(localized: "找不到 \(source.applicationName)，应用可能已被移除。")
             return
         }
         openingSourceIdentifier = source.bundleIdentifier
@@ -44,7 +44,7 @@ final class PlaybackController: ObservableObject {
                 guard let self else { return }
                 self.openingSourceIdentifier = nil
                 if let error {
-                    self.sourceOpenError = "无法打开 \(source.applicationName)：\(error.localizedDescription)"
+                    self.sourceOpenError = String(localized: "无法打开 \(source.applicationName)：\(error.localizedDescription)")
                 } else {
                     app?.unhide()
                     app?.activate(options: [.activateAllWindows])
@@ -84,11 +84,11 @@ final class PlaybackController: ObservableObject {
     }
 
     var backwardControlLabel: String {
-        transportMode == .timeSkipping ? "后退 15 秒" : "上一首"
+        transportMode == .timeSkipping ? String(localized: "后退 15 秒") : String(localized: "上一首")
     }
 
     var forwardControlLabel: String {
-        transportMode == .timeSkipping ? "前进 30 秒" : "下一首"
+        transportMode == .timeSkipping ? String(localized: "前进 30 秒") : String(localized: "下一首")
     }
 
     private static let timeSkippingBundleIdentifiers: Set<String> = [
@@ -236,7 +236,7 @@ final class PlaybackController: ObservableObject {
             if pendingPlaybackState != nil, Date() < pendingStateDeadline {
                 return
             }
-            applicationName = "未在播放"
+            applicationName = String(localized: "未在播放")
             bundleIdentifier = nil
             title = nil
             artist = nil
@@ -392,7 +392,7 @@ final class PlaybackController: ObservableObject {
     }
 
     private func clearDisplayedSource() {
-        applicationName = "未在播放"
+        applicationName = String(localized: "未在播放")
         bundleIdentifier = nil
         title = nil
         artist = nil
@@ -411,7 +411,7 @@ final class PlaybackController: ObservableObject {
     private func sourceName(for bundleIdentifier: String?) -> String {
         guard let bundleIdentifier,
               let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
-            return "正在播放"
+            return String(localized: "正在播放")
         }
         return FileManager.default.displayName(atPath: url.path)
             .replacingOccurrences(of: ".app", with: "")

@@ -40,7 +40,7 @@ final class AppleMusicLyricsMonitor: ObservableObject {
         recovery.reset()
         prefetchRequest?.cancel()
         prefetched = nil
-        statusMessage = "请连接 Apple Music 并读取当前歌曲。"
+        statusMessage = String(localized: "请连接 Apple Music 并读取当前歌曲。")
         configureDirectConnection()
         directProbe.open()
         if directProbe.isConnected, let snapshot { loadLyrics(for: snapshot) }
@@ -79,7 +79,7 @@ final class AppleMusicLyricsMonitor: ObservableObject {
             self.recovery.reset()
             self.cues = []
             self.currentText = nil
-            self.statusMessage = "Apple Music 已断开，请重新连接。"
+            self.statusMessage = String(localized: "Apple Music 已断开，请重新连接。")
         }
     }
     @Published var isEnabled = UserDefaults.standard.bool(forKey: "showAppleMusicLyrics") {
@@ -186,7 +186,7 @@ final class AppleMusicLyricsMonitor: ObservableObject {
             if snapshot != nil { generation = UUID(); request?.cancel(); snapshot = nil; cues = []; resetRecoveryAndPrefetch() }
             currentText = nil
             isPlaying = false
-            statusMessage = "请在 Apple Music 中播放歌曲"
+            statusMessage = String(localized: "请在 Apple Music 中播放歌曲")
             return
         }
         reading = true
@@ -208,7 +208,7 @@ final class AppleMusicLyricsMonitor: ObservableObject {
                     self.request?.cancel()
                     self.resetRecoveryAndPrefetch()
                     self.needsPermission = error == -1743
-                    self.statusMessage = self.needsPermission ? "需要允许 Cueto 读取 Apple Music" : "暂时无法读取 Apple Music，请重试"
+                    self.statusMessage = self.needsPermission ? String(localized: "需要允许 Cueto 读取 Apple Music") : String(localized: "暂时无法读取 Apple Music，请重试")
                     return
                 }
                 guard let state else {
@@ -219,7 +219,7 @@ final class AppleMusicLyricsMonitor: ObservableObject {
                     self.snapshot = nil
                     self.cues = []
                     self.currentText = nil
-                    self.statusMessage = "请在 Apple Music 中播放歌曲"
+                    self.statusMessage = String(localized: "请在 Apple Music 中播放歌曲")
                     return
                 }
                 let changed = self.snapshot?.key != state.key
@@ -256,7 +256,7 @@ final class AppleMusicLyricsMonitor: ObservableObject {
         request?.cancel()
         loading = true
         let token = generation
-        statusMessage = "正在匹配歌词…"
+        statusMessage = String(localized: "正在匹配歌词…")
         if !usesDirectLyrics, let prepared = prefetched, prepared.0 == song.key {
             apply(prepared.1)
             prefetched = nil
@@ -291,10 +291,10 @@ final class AppleMusicLyricsMonitor: ObservableObject {
                 self.logger.info("Lyrics request failed: \(reason, privacy: .private)")
                 guard attempt < 2 else {
                     self.recovery.failed(at: Date())
-                    self.statusMessage = reason + "，稍后自动重试"
+                    self.statusMessage = String(localized: "\(reason)，稍后自动重试")
                     return
                 }
-                self.statusMessage = reason + "，正在重试…"
+                self.statusMessage = String(localized: "\(reason)，正在重试…")
                 do { try await Task.sleep(for: .seconds(attempt == 0 ? 2 : 6)) }
                 catch { return }
                 guard !Task.isCancelled, self.generation == token else { return }
@@ -305,7 +305,7 @@ final class AppleMusicLyricsMonitor: ObservableObject {
 
     private func apply(_ result: LRCLIBResponse) {
         cues = LRCLyrics.parse(result.syncedLyrics ?? "")
-        statusMessage = result.instrumental == true ? "纯音乐" : (cues.isEmpty ? "没有找到同步歌词" : "")
+        statusMessage = result.instrumental == true ? String(localized: "纯音乐") : (cues.isEmpty ? String(localized: "没有找到同步歌词") : "")
         if cues.isEmpty, result.instrumental != true { recovery.failed(at: Date(), missing: true) }
         else { recovery.reset() }
         updateLine()

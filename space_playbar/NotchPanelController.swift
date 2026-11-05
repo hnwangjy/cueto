@@ -240,14 +240,14 @@ private struct NotchPlaybackView: View {
                 Label("Cueto", systemImage: "waveform.mid").font(.headline)
                 Spacer()
                 Button(action: onClose) { Image(systemName: "xmark") }
-                    .buttonStyle(.plain).help("收起面板")
+                    .buttonStyle(.plain).help(String(localized: "收起面板"))
             }.padding(.horizontal, 16).padding(.top, 14)
             if playback.hasActiveSession {
                 HStack(spacing: 26) {
                     Button(action: playback.goBackward) { Image(systemName: "backward.end.fill") }
                         .help(playback.backwardControlLabel)
                     Button(action: playback.playPause) { Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill") }
-                        .help(playback.isPlaying ? "暂停" : "播放")
+                        .help(playback.isPlaying ? String(localized: "暂停") : String(localized: "播放"))
                     Button(action: playback.goForward) { Image(systemName: "forward.end.fill") }
                         .help(playback.forwardControlLabel)
                 }

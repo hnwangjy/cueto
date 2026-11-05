@@ -62,7 +62,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             controlView.autoresizingMask = [.width, .height]
             controlView.frame = button.bounds
             button.addSubview(controlView)
-            button.setAccessibilityLabel("Cueto 播放控制")
+            button.setAccessibilityLabel(String(localized: "Cueto 播放控制"))
         }
 
         self.statusControlView = controlView

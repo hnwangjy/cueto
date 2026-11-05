@@ -23,17 +23,17 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
     private lazy var sourceButton = makeButton(action: #selector(showNowPlaying))
     private lazy var backwardButton = makeSymbolButton(
         symbol: "backward.end",
-        label: "上一首",
+        label: String(localized: "上一首"),
         action: #selector(goBackward)
     )
     private lazy var playPauseButton = makeSymbolButton(
         symbol: "play.fill",
-        label: "播放",
+        label: String(localized: "播放"),
         action: #selector(togglePlayback)
     )
     private lazy var forwardButton = makeSymbolButton(
         symbol: "forward.end",
-        label: "下一首",
+        label: String(localized: "下一首"),
         action: #selector(goForward)
     )
 
@@ -124,9 +124,9 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
 
     override func rightMouseDown(with event: NSEvent) {
         let menu = NSMenu()
-        menu.addItem(withTitle: "打开 Cueto", action: #selector(openCueto), keyEquivalent: "")
+        menu.addItem(withTitle: String(localized: "打开 Cueto"), action: #selector(openCueto), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "退出 Cueto", action: #selector(quitCueto), keyEquivalent: "")
+        menu.addItem(withTitle: String(localized: "退出 Cueto"), action: #selector(quitCueto), keyEquivalent: "")
         menu.items.forEach { $0.target = self }
         NSMenu.popUpContextMenu(menu, with: event, for: self)
     }
@@ -136,8 +136,8 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
         separator.translatesAutoresizingMaskIntoConstraints = false
 
         sourceButton.kind = .source
-        sourceButton.toolTip = "查看当前播放来源"
-        sourceButton.setAccessibilityLabel("当前播放来源")
+        sourceButton.toolTip = String(localized: "查看当前播放来源")
+        sourceButton.setAccessibilityLabel(String(localized: "当前播放来源"))
         sourceButton.setContentHuggingPriority(.defaultLow, for: .horizontal)
         sourceButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
@@ -271,14 +271,14 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
         forwardButton.isHidden = idle
         sourceWidthConstraint?.constant = idle ? 0 : -80
         sourceButton.isIdleState = idle
-        sourceButton.toolTip = idle ? "打开 Cueto" : "查看当前播放来源"
-        sourceButton.setAccessibilityLabel(idle ? "打开 Cueto" : "当前播放来源")
+        sourceButton.toolTip = idle ? String(localized: "打开 Cueto") : String(localized: "查看当前播放来源")
+        sourceButton.setAccessibilityLabel(idle ? String(localized: "打开 Cueto") : String(localized: "当前播放来源"))
         needsLayout = true
     }
 
     private func refreshPlaybackState() {
         let isPlaying = playback.isPlaying
-        let label = isPlaying ? "暂停" : "播放"
+        let label = isPlaying ? String(localized: "暂停") : String(localized: "播放")
         playPauseButton.kind = .symbol(isPlaying ? "pause.fill" : "play.fill")
         playPauseButton.toolTip = label
         playPauseButton.setAccessibilityLabel(label)

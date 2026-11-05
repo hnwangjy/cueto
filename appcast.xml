@@ -3,6 +3,25 @@
     <channel>
         <title>Cueto</title>
         <item>
+            <title>1.3.0</title>
+            <pubDate>Fri, 06 Nov 2026 00:17:52 +0800</pubDate>
+            <link>https://github.com/hnwangjy/cueto</link>
+            <sparkle:version>16</sparkle:version>
+            <sparkle:shortVersionString>1.3.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.7</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Cueto 1.3.0
+
+Cueto 现已支持简体中文和英文，界面跟随 macOS 为应用选择的语言。
+
+Cueto now supports Simplified Chinese and English and follows the language selected for the app in macOS.
+
+打开 DMG，将 Cueto 拖入「应用程序」。已安装 Cueto 的用户也可以在设置中检查更新。
+
+Open the DMG and drag Cueto into Applications. Existing users can check for updates in Cueto Settings.
+]]></description>
+            <enclosure url="https://github.com/hnwangjy/cueto/releases/download/v1.3.0/Cueto-1.3.0.dmg" type="application/octet-stream" sparkle:edSignature="1jrpx6l9C0OuB1a8sbs+VRgAB4On3LXDvSl2TMF99qU53vyn2tOlh1cvUlQUTIIFHtFIw+gdv+xn2DaAGclzCw==" length="4395014"/>
+        </item>
+        <item>
             <title>1.2.3</title>
             <pubDate>Tue, 03 Nov 2026 18:02:03 +0800</pubDate>
             <link>https://github.com/hnwangjy/cueto</link>

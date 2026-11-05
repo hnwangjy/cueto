@@ -66,7 +66,7 @@ final class CuetoSettingsModel: ObservableObject {
                 try SMAppService.mainApp.unregister()
             }
         } catch {
-            errorMessage = "无法更改开机启动设置：\(error.localizedDescription)"
+            errorMessage = String(localized: "无法更改开机启动设置：\(error.localizedDescription)")
         }
         refresh()
     }
@@ -108,7 +108,7 @@ struct CuetoSettingsView: View {
     private var versionText: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
-        return "版本 \(version)（\(build)）"
+        return String(localized: "版本 \(version)（\(build)）")
     }
 
     var body: some View {
@@ -128,11 +128,11 @@ struct CuetoSettingsView: View {
                 }
             }
 
-            sectionHeading("通用")
+            sectionHeading(String(localized: "通用"))
             VStack(spacing: 0) {
                 settingRow(
                     icon: "power",
-                    title: "登录时自动启动"
+                    title: String(localized: "登录时自动启动")
                 ) {
                     Toggle("", isOn: Binding(
                         get: { model.launchAtLogin },
@@ -146,7 +146,7 @@ struct CuetoSettingsView: View {
 
                 settingRow(
                     icon: "arrow.triangle.2.circlepath",
-                    title: "自动检查更新"
+                    title: String(localized: "自动检查更新")
                 ) {
                     Toggle("", isOn: Binding(
                         get: { model.automaticallyChecksForUpdates },
@@ -159,18 +159,18 @@ struct CuetoSettingsView: View {
             }
             .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
-            sectionHeading("实验功能", experimental: true)
+            sectionHeading(String(localized: "实验功能"), experimental: true)
             VStack(alignment: .leading, spacing: 0) {
                 settingRow(
                     icon: "captions.bubble",
-                    title: "菜单栏字幕 · 小宇宙"
+                    title: String(localized: "菜单栏字幕 · 小宇宙")
                 ) {
                     Toggle("", isOn: $subtitles.isEnabled)
                         .labelsHidden()
                         .toggleStyle(.switch)
                 }
 
-                Text("跨桌面时字幕可能停止更新。")
+                Text(String(localized: "跨桌面时字幕可能停止更新。"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -179,9 +179,9 @@ struct CuetoSettingsView: View {
 
                 if subtitles.isEnabled || appleLyrics.isEnabled {
                     HStack(spacing: 16) {
-                        Text("字幕宽度").font(.system(size: 12))
+                        Text(String(localized: "字幕宽度")).font(.system(size: 12))
                         Spacer(minLength: 0)
-                        Picker("字幕宽度", selection: $subtitles.width) {
+                        Picker(String(localized: "字幕宽度"), selection: $subtitles.width) {
                             ForEach(SubtitleWidth.allCases, id: \.self) { width in
                                 Text(width.title).tag(width)
                             }
@@ -201,7 +201,7 @@ struct CuetoSettingsView: View {
                             .fixedSize(horizontal: false, vertical: true)
                         Spacer(minLength: 0)
                         if subtitles.needsPermission {
-                            Button("授权…", action: subtitles.requestPermission)
+                            Button(String(localized: "授权…"), action: subtitles.requestPermission)
                                 .controlSize(.small)
                         }
                     }
@@ -227,37 +227,37 @@ struct CuetoSettingsView: View {
 
                 Divider().padding(.leading, 44)
 #if CUETO_APPLE_MUSIC_LYRICS
-                settingRow(icon: "music.note", title: "Apple Music 歌词") {
+                settingRow(icon: "music.note", title: String(localized: "Apple Music 歌词")) {
                     Toggle("", isOn: $appleLyrics.isEnabled)
                         .labelsHidden().toggleStyle(.switch)
                 }
                 if appleLyrics.isEnabled {
                     if !appleLyrics.usesDirectLyrics {
-                        Text("歌曲信息发送至 LRCLIB，歌词缓存在本机。")
+                        Text(String(localized: "歌曲信息发送至 LRCLIB，歌词缓存在本机。"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .padding(.leading, 44)
                             .padding(.trailing, 14)
                     }
                     HStack(spacing: 12) {
-                        Text(appleLyrics.currentText ?? (appleLyrics.showsMissingLyrics ? "未读取到歌词" : ""))
+                        Text(appleLyrics.currentText ?? (appleLyrics.showsMissingLyrics ? String(localized: "未读取到歌词") : ""))
                             .font(.system(size: 13, weight: .medium))
                             .foregroundStyle(appleLyrics.currentText == nil ? .secondary : .primary)
                             .lineLimit(2, reservesSpace: true)
                             .frame(maxWidth: .infinity, alignment: .leading)
 
                         if appleLyrics.needsPermission || appleLyrics.showsMissingLyrics {
-                            Button(appleLyrics.needsPermission ? "授权…" : "重试", action: appleLyrics.retry)
+                            Button(appleLyrics.needsPermission ? String(localized: "授权…") : String(localized: "重试"), action: appleLyrics.retry)
                                 .help(appleLyrics.statusMessage)
                         }
                         if !appleLyrics.isDirectConnected && appleLyrics.currentText == nil {
-                            Button("连接…", action: appleLyrics.openDirectProbe)
-                                .accessibilityLabel("连接 Apple Music")
+                            Button(String(localized: "连接…"), action: appleLyrics.openDirectProbe)
+                                .accessibilityLabel(String(localized: "连接 Apple Music"))
                         }
                     }
                     .contextMenu {
                         if appleLyrics.isDirectConnected {
-                            Button("管理 Apple Music 连接…", action: appleLyrics.openDirectProbe)
+                            Button(String(localized: "管理 Apple Music 连接…"), action: appleLyrics.openDirectProbe)
                         }
                     }
                     .buttonStyle(.bordered)
@@ -273,22 +273,22 @@ struct CuetoSettingsView: View {
 #endif
                 settingRow(
                     icon: "macbook",
-                    title: "灵动岛面板"
+                    title: String(localized: "灵动岛面板")
                 ) {
                     Toggle("", isOn: $openPanelAtNotch)
                         .labelsHidden()
                         .toggleStyle(.switch)
-                        .help("悬停 MacBook 刘海展开，移开后收起")
+                        .help(String(localized: "悬停 MacBook 刘海展开，移开后收起"))
                 }
             }
             .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
             VStack(alignment: .leading, spacing: 9) {
                 HStack {
-                    Text("隐藏应用")
+                    Text(String(localized: "隐藏应用"))
                         .font(.system(size: 13, weight: .semibold))
                     Spacer()
-                    Button("添加应用…", action: chooseApplication)
+                    Button(String(localized: "添加应用…"), action: chooseApplication)
                         .controlSize(.small)
                 }
 
@@ -325,10 +325,10 @@ struct CuetoSettingsView: View {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Image(systemName: "exclamationmark.circle.fill")
                         .foregroundStyle(.orange)
-                    Text("需要在系统设置的“登录项”中允许 Cueto。")
+                    Text(String(localized: "需要在系统设置的“登录项”中允许 Cueto。"))
                         .font(.caption)
                     Spacer()
-                    Button("打开系统设置", action: model.openLoginItemsSettings)
+                    Button(String(localized: "打开系统设置"), action: model.openLoginItemsSettings)
                         .controlSize(.small)
                 }
             }
@@ -344,7 +344,7 @@ struct CuetoSettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 Spacer()
-                Button("立即检查更新", action: model.checkForUpdates)
+                Button(String(localized: "立即检查更新"), action: model.checkForUpdates)
                     .disabled(!model.canCheckForUpdates)
                     .keyboardShortcut("u", modifiers: [.command])
             }
@@ -377,7 +377,7 @@ struct CuetoSettingsView: View {
 
     private func chooseApplication() {
         let panel = NSOpenPanel()
-        panel.title = "选择要隐藏的应用"
+        panel.title = String(localized: "选择要隐藏的应用")
         panel.allowedContentTypes = [.applicationBundle]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false

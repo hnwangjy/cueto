@@ -1,0 +1,23 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "NSAppleEventsUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cueto controls playback and reads the current track and its position to display synced lyrics."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cueto 控制音乐的播放、暂停和切歌，并读取当前歌曲与进度以同步显示歌词。"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

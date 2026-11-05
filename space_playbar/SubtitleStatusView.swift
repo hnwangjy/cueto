@@ -27,7 +27,7 @@ final class SubtitleStatusView: NSButton {
         isBordered = false
         wantsLayer = true
         layer?.masksToBounds = true
-        setAccessibilityLabel("当前字幕或歌词")
+        setAccessibilityLabel(String(localized: "当前字幕或歌词"))
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }

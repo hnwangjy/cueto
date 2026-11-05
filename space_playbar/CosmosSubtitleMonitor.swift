@@ -8,9 +8,9 @@ enum SubtitleWidth: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .short: return "短"
-        case .medium: return "适中"
-        case .long: return "长"
+        case .short: return String(localized: "短")
+        case .medium: return String(localized: "适中")
+        case .long: return String(localized: "长")
         }
     }
 
@@ -41,7 +41,7 @@ final class CosmosSubtitleMonitor: ObservableObject {
     }
     @Published private(set) var currentText: String?
     @Published private(set) var needsPermission = false
-    @Published private(set) var statusMessage = "开启后，在菜单栏显示小宇宙当前字幕"
+    @Published private(set) var statusMessage = String(localized: "开启后，在菜单栏显示小宇宙当前字幕")
 
     private var timer: AnyCancellable?
     private let readerQueue = DispatchQueue(label: "com.wangjiayuan.cueto.subtitles", qos: .utility)
@@ -74,20 +74,20 @@ final class CosmosSubtitleMonitor: ObservableObject {
         guard isEnabled else {
             currentText = nil
             needsPermission = false
-            statusMessage = "开启后，在菜单栏显示小宇宙当前字幕"
+            statusMessage = String(localized: "开启后，在菜单栏显示小宇宙当前字幕")
             return
         }
         needsPermission = !AXIsProcessTrusted()
         guard !needsPermission else {
             currentText = nil
-            statusMessage = "需要辅助功能授权，用于读取小宇宙播放页的字幕文字"
+            statusMessage = String(localized: "需要辅助功能授权，用于读取小宇宙播放页的字幕文字")
             return
         }
         guard let app = NSWorkspace.shared.runningApplications.first(where: {
                   $0.bundleIdentifier == "app.podcast.cosmos"
               }) else {
             currentText = nil
-            statusMessage = "请启动小宇宙并打开默认播放页"
+            statusMessage = String(localized: "请启动小宇宙并打开默认播放页")
             return
         }
         guard !isReading else { return }
@@ -103,8 +103,8 @@ final class CosmosSubtitleMonitor: ObservableObject {
                 guard self.generation == token, self.isEnabled else { return }
                 if self.currentText != text { self.currentText = text }
                 let message = text == nil
-                    ? "请回到小宇宙默认播放页，显示封面下方的小字幕"
-                    : "正在读取默认播放页的小字幕"
+                    ? String(localized: "请回到小宇宙默认播放页，显示封面下方的小字幕")
+                    : String(localized: "正在读取默认播放页的小字幕")
                 if self.statusMessage != message { self.statusMessage = message }
             }
         }
@@ -201,7 +201,7 @@ final class CosmosSubtitleMonitor: ObservableObject {
             let items = children(element)
             let roles = items.map { attribute($0, kAXRoleAttribute) as? String ?? "" }
             let hasProgress = zip(items, roles).contains {
-                $0.1 == kAXSliderRole && text($0.0) == "播放进度"
+                $0.1 == kAXSliderRole && text($0.0) == String(localized: "播放进度")
             }
             let hasTransport = zip(items, roles).contains {
                 $0.1 == kAXButtonRole && text($0.0) == "后退15秒"

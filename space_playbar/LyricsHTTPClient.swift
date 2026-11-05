@@ -7,8 +7,8 @@ enum LyricsRequestError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .http(let status): return "歌词服务返回 HTTP \(status)"
-        case .invalidResponse: return "歌词服务响应格式异常"
+        case .http(let status): return String(localized: "歌词服务返回 HTTP \(status)")
+        case .invalidResponse: return String(localized: "歌词服务响应格式异常")
         }
     }
 }
@@ -36,13 +36,13 @@ enum LyricsHTTPClient {
 
     nonisolated static func failureMessage(_ error: Error) -> String {
         if let error = error as? LyricsRequestError { return error.localizedDescription }
-        if error is DecodingError { return "歌词服务响应格式异常" }
+        if error is DecodingError { return String(localized: "歌词服务响应格式异常") }
         switch (error as NSError).code {
-        case NSURLErrorTimedOut: return "歌词请求超时"
-        case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost: return "歌词网络连接中断"
-        case NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed: return "无法解析歌词服务地址"
-        case NSURLErrorCannotConnectToHost: return "无法连接歌词服务"
-        default: return "歌词请求失败（\((error as NSError).code)）"
+        case NSURLErrorTimedOut: return String(localized: "歌词请求超时")
+        case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost: return String(localized: "歌词网络连接中断")
+        case NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed: return String(localized: "无法解析歌词服务地址")
+        case NSURLErrorCannotConnectToHost: return String(localized: "无法连接歌词服务")
+        default: return String(localized: "歌词请求失败（\((error as NSError).code)）")
         }
     }
 }

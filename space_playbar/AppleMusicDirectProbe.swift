@@ -24,11 +24,11 @@ enum AppleMusicDirectError: Error, LocalizedError {
 /// No cookie/token extraction or password collection.
 @MainActor
 final class AppleMusicDirectProbe: NSObject, ObservableObject, WKNavigationDelegate, NSWindowDelegate {
-    @Published private(set) var status = "请在苹果页面登录后，读取当前歌曲。"
+    @Published private(set) var status = String(localized: "请在苹果页面登录后，读取当前歌曲。")
     @Published private(set) var busy = false
     @Published private(set) var lineCount = 0
     @Published private(set) var isConnected = false
-    @Published private(set) var accountSummary = "未连接"
+    @Published private(set) var accountSummary = String(localized: "未连接")
     let webView: WKWebView
     var currentTrack: (() -> AppleMusicProbeTrack?)?
     var onLyrics: ((String, [LyricCue]) -> Void)?
@@ -67,7 +67,7 @@ final class AppleMusicDirectProbe: NSObject, ObservableObject, WKNavigationDeleg
         guard window == nil else { return }
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1000, height: 780),
                               styleMask: [.titled, .closable, .resizable, .miniaturizable], backing: .buffered, defer: false)
-        window.title = "连接 Apple Music"
+        window.title = String(localized: "连接 Apple Music")
         window.isReleasedWhenClosed = false
         window.delegate = self
         window.contentView = webView
@@ -81,7 +81,7 @@ final class AppleMusicDirectProbe: NSObject, ObservableObject, WKNavigationDeleg
     func login() {
         operation?.cancel()
         busy = false
-        status = "正在恢复 Apple Music 登录；未登录时请在苹果页面完成登录。"
+        status = String(localized: "正在恢复 Apple Music 登录；未登录时请在苹果页面完成登录。")
         webView.load(URLRequest(url: URL(string: "https://music.apple.com/")!))
         startSessionObservation()
     }
@@ -98,19 +98,19 @@ final class AppleMusicDirectProbe: NSObject, ObservableObject, WKNavigationDeleg
         sessionRevision = UUID()
         sessionTimer = nil
         isConnected = false
-        accountSummary = "未连接"
+        accountSummary = String(localized: "未连接")
         onSessionDisconnected?()
         webView.stopLoading()
         webView.loadHTMLString("", baseURL: nil)
         busy = true
-        status = "正在清除 Cueto 的 Apple Music 登录…"
+        status = String(localized: "正在清除 Cueto 的 Apple Music 登录…")
         let store = webView.configuration.websiteDataStore
         store.fetchDataRecords(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes()) { [weak self] records in
             let apple = records.filter { $0.displayName == "apple.com" || $0.displayName.hasSuffix(".apple.com") }
             store.removeData(ofTypes: WKWebsiteDataStore.allWebsiteDataTypes(), for: apple) {
                 Task { @MainActor [weak self] in
                     self?.busy = false
-                    self?.status = "已断开。音乐应用和其他浏览器的登录不受影响。"
+                    self?.status = String(localized: "已断开。音乐应用和其他浏览器的登录不受影响。")
                 }
             }
         }
@@ -138,15 +138,15 @@ final class AppleMusicDirectProbe: NSObject, ObservableObject, WKNavigationDeleg
             let newlyConnected = !isConnected
             isConnected = true
             let region = (info["region"] as? String ?? "").uppercased()
-            accountSummary = region.isEmpty ? "已连接 Apple Music" : "已连接 · \(region)"
+            accountSummary = region.isEmpty ? String(localized: "已连接 Apple Music") : String(localized: "已连接 · \(region)")
             if newlyConnected {
-                status = "已恢复登录，正在读取当前歌曲歌词。"
+                status = String(localized: "已恢复登录，正在读取当前歌曲歌词。")
                 onSessionConnected?()
             }
             return true
         }
         isConnected = false
-        accountSummary = "需要登录"
+        accountSummary = String(localized: "需要登录")
         return false
     }
 
@@ -157,23 +157,23 @@ final class AppleMusicDirectProbe: NSObject, ObservableObject, WKNavigationDeleg
             if (try? await inspectSession()) == true { return }
             try await Task.sleep(for: .milliseconds(500))
         }
-        throw AppleMusicDirectError.unavailable("请连接 Apple Music，完成登录后会自动继续。")
+        throw AppleMusicDirectError.unavailable(String(localized: "请连接 Apple Music，完成登录后会自动继续。"))
     }
 
     func testMusicKit() {
         guard !busy else { return }
         busy = true
-        status = "正在验证本应用的 MusicKit 开发者凭据…"
+        status = String(localized: "正在验证本应用的 MusicKit 开发者凭据…")
         operation = Task { [weak self] in
             do {
                 // Do not harvest Apple's website developer token or log credentials.
                 _ = try await MusicDataRequest.tokenProvider.developerToken(options: [])
                 guard !Task.isCancelled, let self else { return }
-                self.status = "本应用的 MusicKit 开发者凭据可用；这尚不证明具备歌词权限。"
+                self.status = String(localized: "本应用的 MusicKit 开发者凭据可用；这尚不证明具备歌词权限。")
                 self.busy = false
             } catch {
                 guard !Task.isCancelled, let self else { return }
-                self.status = "本应用暂时无法取得 MusicKit 开发者凭据（\((error as NSError).code)）；网页直连可单独测试。"
+                self.status = String(localized: "本应用暂时无法取得 MusicKit 开发者凭据（\((error as NSError).code)）；网页直连可单独测试。")
                 self.busy = false
             }
         }
@@ -181,28 +181,28 @@ final class AppleMusicDirectProbe: NSObject, ObservableObject, WKNavigationDeleg
 
     func readLyrics() {
         guard !busy else { return }
-        guard let track = currentTrack?() else { status = "请先在 Mac 的音乐应用播放一首歌曲。"; return }
+        guard let track = currentTrack?() else { status = String(localized: "请先在 Mac 的音乐应用播放一首歌曲。"); return }
         guard webView.url?.scheme == "https", webView.url?.host == "music.apple.com" else {
-            status = "请先回到 Apple Music 页面并完成登录。"; return
+            status = String(localized: "请先回到 Apple Music 页面并完成登录。"); return
         }
         busy = true
         lineCount = 0
-        status = "正在通过苹果网页会话读取歌词…"
+        status = String(localized: "正在通过苹果网页会话读取歌词…")
         operation = Task { [weak self] in
             guard let self else { return }
             defer { self.busy = false }
             do {
                 let cues = try await self.fetchLyrics(for: track)
                 let count = cues.filter { !$0.text.isEmpty }.count
-                guard self.currentTrack?()?.key == track.key else { self.status = "歌曲已切换，请重新读取。"; return }
+                guard self.currentTrack?()?.key == track.key else { self.status = String(localized: "歌曲已切换，请重新读取。"); return }
                 self.lineCount = count
                 self.onLyrics?(track.key, cues)
-                self.status = "直连成功：\(count) 行同步歌词，已用于当前歌曲。"
+                self.status = String(localized: "直连成功：\(count) 行同步歌词，已用于当前歌曲。")
             } catch {
                 guard !Task.isCancelled else { return }
                 // WebKit errors may contain webpage request details. Keep them out of logs/UI.
                 self.status = (error as? AppleMusicDirectError)?.localizedDescription
-                    ?? "网页会话读取失败（\((error as NSError).code)）。请确认已登录并拥有有效订阅。"
+                    ?? String(localized: "网页会话读取失败（\((error as NSError).code)）。请确认已登录并拥有有效订阅。")
             }
         }
     }
@@ -224,14 +224,26 @@ final class AppleMusicDirectProbe: NSObject, ObservableObject, WKNavigationDeleg
             in: nil, contentWorld: .page)
         try Task.checkCancellation()
         guard let result = value as? [String: Any] else {
-            throw AppleMusicDirectError.unavailable("苹果网页没有返回可识别的结果。")
+            throw AppleMusicDirectError.unavailable(String(localized: "苹果网页没有返回可识别的结果。"))
         }
         guard let ttml = result["ttml"] as? String else {
-            throw AppleMusicDirectError.unavailable(result["message"] as? String ?? "未取得苹果歌词。")
+            let status = result["status"] as? Int ?? 0
+            let message: String
+            switch result["code"] as? String {
+            case "notReady": message = String(localized: "苹果网页播放器尚未就绪，请等待页面加载完成。")
+            case "signIn": message = String(localized: "请先在苹果页面登录 Apple Music。")
+            case "storefront": message = String(localized: "无法确认账号地区，请先在网页中打开音乐资料库。")
+            case "noMatch": message = String(localized: "苹果目录中未确认当前歌曲版本；尚未请求歌词。")
+            case "noLyrics": message = String(localized: "已确认歌曲，但网页会话未返回同步歌词；不能据此区分曲目缺失和内部接口权限限制。")
+            case "denied": message = String(localized: "苹果歌词请求被拒绝（HTTP \(status)）。")
+            case "http": message = String(localized: "歌词服务返回 HTTP \(status)")
+            default: message = String(localized: "未取得苹果歌词。")
+            }
+            throw AppleMusicDirectError.unavailable(message)
         }
         let cues = AppleTTMLLyrics.parse(ttml)
         guard cues.contains(where: { !$0.text.isEmpty }) else {
-            throw AppleMusicDirectError.unavailable("已收到苹果歌词，但时间轴格式暂不支持。")
+            throw AppleMusicDirectError.unavailable(String(localized: "已收到苹果歌词，但时间轴格式暂不支持。"))
         }
         return cues
     }
@@ -248,10 +260,10 @@ final class AppleMusicDirectProbe: NSObject, ObservableObject, WKNavigationDeleg
 
     private static let script = #"""
     const kit = globalThis.MusicKit?.getInstance?.();
-    if (!kit?.api?.music) return {message: "苹果网页播放器尚未就绪，请等待页面加载完成。"};
-    if (!kit.isAuthorized) return {message: "请先在苹果页面登录 Apple Music。"};
+    if (!kit?.api?.music) return {code: "notReady"};
+    if (!kit.isAuthorized) return {code: "signIn"};
     const region = kit.storefrontId;
-    if (!region || !/^[a-z]{2}$/i.test(region)) return {message: "无法确认账号地区，请先在网页中打开音乐资料库。"};
+    if (!region || !/^[a-z]{2}$/i.test(region)) return {code: "storefront"};
     const request = async (path, params = {}) => {
         let timer;
         try {
@@ -275,7 +287,7 @@ final class AppleMusicDirectProbe: NSObject, ObservableObject, WKNavigationDeleg
         const albumRank = Number(normalize(ay.albumName) === normalize(album)) - Number(normalize(ax.albumName) === normalize(album));
         return albumRank || Math.abs(ax.durationInMillis / 1000 - duration) - Math.abs(ay.durationInMillis / 1000 - duration);
     });
-    if (!candidates.length) return {message: "苹果目录中未确认当前歌曲版本；尚未请求歌词。"};
+    if (!candidates.length) return {code: "noMatch"};
     const song = candidates[0];
     for (const kind of ["syllable-lyrics", "lyrics"]) {
         try {
@@ -285,11 +297,11 @@ final class AppleMusicDirectProbe: NSObject, ObservableObject, WKNavigationDeleg
             if (typeof ttml === "string" && ttml.includes("<")) return {ttml};
         } catch (error) {
             const status = Number(error?.status ?? error?.response?.status ?? 0);
-            if (status === 401 || status === 403) return {message: `苹果歌词请求被拒绝（HTTP ${status}）。普通网页登录尚不足以访问此接口。`};
-            if (status && status !== 404) return {message: `苹果歌词服务返回 HTTP ${status}。`};
+            if (status === 401 || status === 403) return {code: "denied", status};
+            if (status && status !== 404) return {code: "http", status};
         }
     }
-    return {message: "已确认歌曲，但网页会话未返回同步歌词；不能据此区分曲目缺失和内部接口权限限制。"};
+    return {code: "noLyrics"};
     """#
 }
 
@@ -300,10 +312,10 @@ private struct ProbeView: View {
             HStack {
                 Text(probe.accountSummary).font(.headline)
                 Spacer()
-                Button("打开音乐", action: probe.openMusic)
-                Button("重新连接", action: probe.login)
-                Button("断开连接", action: probe.disconnect)
-                Button("读取当前歌曲歌词", action: probe.readLyrics).buttonStyle(.borderedProminent)
+                Button(String(localized: "打开音乐"), action: probe.openMusic)
+                Button(String(localized: "重新连接"), action: probe.login)
+                Button(String(localized: "断开连接"), action: probe.disconnect)
+                Button(String(localized: "读取当前歌曲歌词"), action: probe.readLyrics).buttonStyle(.borderedProminent)
             }.disabled(probe.busy)
             Text(probe.status).font(.callout).textSelection(.enabled)
             ProbeWebView(webView: probe.webView)
