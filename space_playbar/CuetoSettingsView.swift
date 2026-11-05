@@ -232,27 +232,42 @@ struct CuetoSettingsView: View {
                         .labelsHidden().toggleStyle(.switch)
                 }
                 if appleLyrics.isEnabled {
-                    HStack {
-                        Spacer()
-                        Button("连接 Apple Music…", action: appleLyrics.openDirectProbe)
-                            .controlSize(.small)
-                    }.padding(.horizontal, 14).padding(.bottom, 8)
-                    Text(appleLyrics.usesDirectLyrics ? "通过 Apple Music 登录会话直接获取歌词。" : "歌曲信息发送至 LRCLIB，歌词缓存在本机。")
-                        .font(.caption).foregroundStyle(.secondary)
-                        .padding(.horizontal, 14).padding(.bottom, 12)
-                    if let text = appleLyrics.currentText {
-                        Text(text).font(.system(size: 13)).lineLimit(3)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(12).background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
-                            .padding(.horizontal, 14).padding(.bottom, 12)
-                    } else if !appleLyrics.statusMessage.isEmpty {
-                        HStack {
-                            Text(appleLyrics.statusMessage).font(.caption).foregroundStyle(.secondary)
-                            Spacer()
-                            Button(appleLyrics.needsPermission ? "授权…" : "重试", action: appleLyrics.retry)
-                                .controlSize(.small)
-                        }.padding(.horizontal, 14).padding(.bottom, 12)
+                    if !appleLyrics.usesDirectLyrics {
+                        Text("歌曲信息发送至 LRCLIB，歌词缓存在本机。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.leading, 44)
+                            .padding(.trailing, 14)
                     }
+                    HStack(spacing: 12) {
+                        Text(appleLyrics.currentText ?? (appleLyrics.showsMissingLyrics ? "未读取到歌词" : ""))
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundStyle(appleLyrics.currentText == nil ? .secondary : .primary)
+                            .lineLimit(2, reservesSpace: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
+                        if appleLyrics.needsPermission || appleLyrics.showsMissingLyrics {
+                            Button(appleLyrics.needsPermission ? "授权…" : "重试", action: appleLyrics.retry)
+                                .help(appleLyrics.statusMessage)
+                        }
+                        if !appleLyrics.isDirectConnected && appleLyrics.currentText == nil {
+                            Button("连接…", action: appleLyrics.openDirectProbe)
+                                .accessibilityLabel("连接 Apple Music")
+                        }
+                    }
+                    .contextMenu {
+                        if appleLyrics.isDirectConnected {
+                            Button("管理 Apple Music 连接…", action: appleLyrics.openDirectProbe)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+                    .padding(.leading, 44)
+                    .padding(.trailing, 14)
+                    .padding(.bottom, 12)
                 }
                 Divider().padding(.leading, 44)
 #endif

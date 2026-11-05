@@ -72,7 +72,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .combineLatest(appleLyrics.$isPlaying, playback.$bundleIdentifier)
             .receive(on: RunLoop.main)
             .sink { [weak self] values, playing, source in
-                self?.updateSubtitleItem(self?.appleLyrics.isEnabled == true && (playing || source == "com.apple.Music") ? values.1 : values.0, width: values.2.points)
+                guard let self else { return }
+                let showsAppleLyrics = appleLyrics.isEnabled && (playing || source == "com.apple.Music")
+                let text = showsAppleLyrics ? values.1 : values.0
+                let maximumWidth = values.2.points
+                let width = if showsAppleLyrics, let text {
+                    min(maximumWidth, SubtitleStatusView.fittingWidth(for: text))
+                } else {
+                    maximumWidth
+                }
+                updateSubtitleItem(text, width: width, subtleTransition: showsAppleLyrics)
             }
             .store(in: &subtitleObservations)
         statusItemObservation = playback.$applicationName
@@ -92,7 +101,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusControlView?.handleStatusItemEvent(NSApp.currentEvent)
     }
 
-    private func updateSubtitleItem(_ text: String?, width: CGFloat) {
+    private func updateSubtitleItem(_ text: String?, width: CGFloat, subtleTransition: Bool) {
         guard let text, !text.isEmpty else {
             if let item = subtitleStatusItem { NSStatusBar.system.removeStatusItem(item) }
             subtitleStatusItem = nil
@@ -111,7 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         item.length = width
         item.view?.setFrameSize(NSSize(width: width, height: NSStatusBar.system.thickness))
-        (item.view as? SubtitleStatusView)?.show(text)
+        (item.view as? SubtitleStatusView)?.show(text, subtleTransition: subtleTransition)
     }
 
     @objc private func openSubtitleSettings() { openCueto() }

@@ -2,13 +2,24 @@
 import AppKit
 import QuartzCore
 
-/// Fixed menu-bar footprint; only the text layers move.
+/// Draws and animates text inside the menu-bar item.
 @MainActor
 final class SubtitleStatusView: NSButton {
     private var currentText = ""
     private var textContainer: CALayer?
     private var primaryText: CATextLayer?
-    private let textFont = NSFont.systemFont(ofSize: 13, weight: .medium)
+    private static let textFont = NSFont.systemFont(ofSize: 13, weight: .medium)
+
+    private static let leadingInset: CGFloat = 6
+    private static let trailingInset: CGFloat = 10
+
+    static func fittingWidth(for text: String) -> CGFloat {
+        textWidth(for: text) + leadingInset + trailingInset
+    }
+
+    private static func textWidth(for text: String) -> CGFloat {
+        ceil((text as NSString).size(withAttributes: [.font: textFont]).width) + 2
+    }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
@@ -29,7 +40,7 @@ final class SubtitleStatusView: NSButton {
         if changed { render(transition: false, offset: offset) }
     }
 
-    func show(_ text: String) {
+    func show(_ text: String, subtleTransition: Bool) {
         guard currentText != text else { return }
         // Growing the same sentence should continue from the visible words.
         if !currentText.isEmpty, text.hasPrefix(currentText) {
@@ -42,7 +53,7 @@ final class SubtitleStatusView: NSButton {
         }
         // The panel and menu bar must advance on the same source update.
         // Never postpone the next sentence to finish a previous scroll.
-        present(text)
+        present(text, subtleTransition: subtleTransition)
     }
 
     private var readingOffset: CGFloat {
@@ -50,11 +61,11 @@ final class SubtitleStatusView: NSButton {
         return max(0, -(text.presentation() ?? text).transform.m41)
     }
 
-    private func present(_ text: String) {
+    private func present(_ text: String, subtleTransition: Bool) {
         currentText = text
         toolTip = text
         setAccessibilityValue(text)
-        render(transition: true)
+        render(transition: true, subtleTransition: subtleTransition)
     }
 
     override func viewDidMoveToWindow() {
@@ -72,17 +83,23 @@ final class SubtitleStatusView: NSButton {
         render(transition: false, offset: readingOffset)
     }
 
-    private func render(transition: Bool, offset: CGFloat = 0) {
+    private func render(transition: Bool, offset: CGFloat = 0, subtleTransition: Bool = false) {
         guard let layer, !currentText.isEmpty else { return }
         let reduced = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         // An interrupted sentence transition must not leave outgoing layers behind.
         layer.sublayers?.filter { $0 !== textContainer }.forEach { $0.removeFromSuperlayer() }
         let outgoing = textContainer
         let container = CALayer()
-        container.frame = bounds.insetBy(dx: 6, dy: 0)
+        container.frame = CGRect(
+            x: bounds.minX + Self.leadingInset,
+            y: bounds.minY,
+            width: max(0, bounds.width - Self.leadingInset - Self.trailingInset),
+            height: bounds.height
+        )
         container.masksToBounds = true
         let viewport = container.bounds.width
-        let width = ceil((currentText as NSString).size(withAttributes: [.font: textFont]).width) + 2
+        let width = Self.textWidth(for: currentText)
+        let textFont = Self.textFont
         let overflow = width > viewport
         func makeText(x: CGFloat) -> CATextLayer {
             let text = CATextLayer()
@@ -133,6 +150,15 @@ final class SubtitleStatusView: NSButton {
         textContainer = container
         CATransaction.commit()
         guard transition, let outgoing else { outgoing?.removeFromSuperlayer(); return }
+        if subtleTransition {
+            outgoing.removeFromSuperlayer()
+            let fadeIn = CABasicAnimation(keyPath: "opacity")
+            fadeIn.fromValue = 0.7
+            fadeIn.toValue = 1
+            fadeIn.duration = 0.10
+            container.add(fadeIn, forKey: "sentenceFadeIn")
+            return
+        }
         let duration = 0.18
         CATransaction.begin()
         CATransaction.setCompletionBlock { outgoing.removeFromSuperlayer() }

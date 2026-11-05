@@ -96,11 +96,17 @@ struct NowPlayingPopover: View {
                 playbackProgress(elapsedTime: elapsedTime, duration: duration)
             }
 
-            if let text = appleLyrics.isEnabled && (appleLyrics.isPlaying || playback.bundleIdentifier == "com.apple.Music") ? appleLyrics.currentText : subtitles.currentText {
+            let showsAppleLyrics = appleLyrics.isEnabled &&
+                (appleLyrics.isPlaying || playback.bundleIdentifier == "com.apple.Music")
+            let text = showsAppleLyrics ? appleLyrics.currentText : subtitles.currentText
+            if showsAppleLyrics || text != nil {
                 VStack(alignment: .leading, spacing: 6) {
-                    Label(appleLyrics.isEnabled && (appleLyrics.isPlaying || playback.bundleIdentifier == "com.apple.Music") ? "Apple Music 歌词" : "小宇宙字幕", systemImage: "captions.bubble")
+                    Label(showsAppleLyrics ? "Apple Music 歌词" : "小宇宙字幕", systemImage: "captions.bubble")
                         .font(.caption).foregroundStyle(.secondary)
-                    Text(text).font(.system(size: 13)).fixedSize(horizontal: false, vertical: true)
+                    Text(text ?? (appleLyrics.showsMissingLyrics ? "未读取到歌词" : ""))
+                        .font(.system(size: 13))
+                        .foregroundStyle(text == nil ? .secondary : .primary)
+                        .lineLimit(2, reservesSpace: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(12)

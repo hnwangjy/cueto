@@ -27,6 +27,8 @@ private struct LRCLIBResponse: Codable, Sendable {
 @MainActor
 final class AppleMusicLyricsMonitor: ObservableObject {
     private let directProbe = AppleMusicDirectProbe()
+    @Published private(set) var isDirectConnected = false
+    private var directConnectionObservation: AnyCancellable?
     @Published private(set) var usesDirectLyrics = UserDefaults.standard.bool(forKey: "appleMusicDirectLyrics")
 
     func openDirectProbe() {
@@ -96,6 +98,9 @@ final class AppleMusicLyricsMonitor: ObservableObject {
         }
     }
     @Published private(set) var currentText: String?
+    var showsMissingLyrics: Bool {
+        !loading && snapshot != nil && cues.isEmpty && !statusMessage.isEmpty
+    }
     @Published private(set) var statusMessage = ""
     @Published private(set) var needsPermission = false
     @Published private(set) var isPlaying = false
@@ -107,7 +112,7 @@ final class AppleMusicLyricsMonitor: ObservableObject {
     private var snapshot: MusicSnapshot?
     private var cues: [LyricCue] = []
     private var request: Task<Void, Never>?
-    private var loading = false
+    @Published private var loading = false
     private var recovery = LyricsRecoverySchedule()
     private let networkMonitor = NWPathMonitor()
     private var wakeObservation: AnyCancellable?
@@ -118,6 +123,9 @@ final class AppleMusicLyricsMonitor: ObservableObject {
     private let logger = Logger(subsystem: "com.wangjiayuan.cueto", category: "LyricsRecovery")
 
     init() {
+        directConnectionObservation = directProbe.$isConnected.removeDuplicates().sink { [weak self] connected in
+            self?.isDirectConnected = connected
+        }
         configureDirectConnection()
         networkMonitor.pathUpdateHandler = { [weak self] path in
             guard path.status == .satisfied else { return }
@@ -183,7 +191,7 @@ final class AppleMusicLyricsMonitor: ObservableObject {
         }
         reading = true
         let token = generation
-        let readQueue = Date() >= nextQueueRead
+        let readQueue = !usesDirectLyrics && Date() >= nextQueueRead
         if readQueue { nextQueueRead = Date().addingTimeInterval(15) }
         reader.async { [weak self] in
             let (state, upcoming, error) = Self.readMusic(includeUpcoming: readQueue)
@@ -238,7 +246,9 @@ final class AppleMusicLyricsMonitor: ObservableObject {
         let elapsed = ProcessInfo.processInfo.systemUptime - snapshot.sampledAt
         // Do not keep advancing indefinitely if Music stops answering.
         let position = snapshot.position + (snapshot.playing ? min(max(elapsed, 0), 1.2) : 0)
-        let text = LRCLyrics.line(at: min(position, snapshot.duration), in: cues)
+        // Lead the visual transition slightly while playback is advancing.
+        let displayPosition = position + (snapshot.playing ? 0.30 : 0)
+        let text = LRCLyrics.line(at: min(displayPosition, snapshot.duration), in: cues, bridgingGapsUpTo: usesDirectLyrics ? 0.25 : 0)
         if currentText != text { currentText = text }
     }
 
@@ -261,6 +271,7 @@ final class AppleMusicLyricsMonitor: ObservableObject {
                 if let self, self.usesDirectLyrics {
                     let track = AppleMusicProbeTrack(key: song.key, title: song.title, artist: song.artist,
                                                     album: song.album, duration: song.duration)
+                    self.logger.info("Requesting Apple Music direct lyrics")
                     let directCues = try await self.directProbe.fetchLyrics(for: track)
                     guard !Task.isCancelled, self.generation == token else { return }
                     self.cues = directCues
@@ -277,6 +288,7 @@ final class AppleMusicLyricsMonitor: ObservableObject {
             } catch {
                 guard !Task.isCancelled, let self, self.generation == token else { return }
                 let reason = (error as? AppleMusicDirectError)?.localizedDescription ?? LyricsHTTPClient.failureMessage(error)
+                self.logger.info("Lyrics request failed: \(reason, privacy: .private)")
                 guard attempt < 2 else {
                     self.recovery.failed(at: Date())
                     self.statusMessage = reason + "，稍后自动重试"
@@ -430,6 +442,7 @@ import Combine
 /// regardless of preferences saved by an earlier development build.
 @MainActor
 final class AppleMusicLyricsMonitor: ObservableObject {
+    var showsMissingLyrics: Bool { false }
     @Published private(set) var isEnabled = false
     @Published private(set) var currentText: String? = nil
     @Published private(set) var isPlaying = false

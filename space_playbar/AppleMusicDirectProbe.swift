@@ -38,6 +38,7 @@ final class AppleMusicDirectProbe: NSObject, ObservableObject, WKNavigationDeleg
     private var operation: Task<Void, Never>?
     private var sessionTimer: AnyCancellable?
     private var checkingSession = false
+    private var activeLyricsRequests = 0
     private var sessionRevision = UUID()
 
     override init() {
@@ -209,8 +210,14 @@ final class AppleMusicDirectProbe: NSObject, ObservableObject, WKNavigationDeleg
     func fetchLyrics(for track: AppleMusicProbeTrack) async throws -> [LyricCue] {
         // Only request full scheduling while restoring/requesting, then yield CPU
         // again. No need to show a window just to initialize the authenticated page.
+        activeLyricsRequests += 1
         webView.configuration.preferences.inactiveSchedulingPolicy = .none
-        defer { webView.configuration.preferences.inactiveSchedulingPolicy = .throttle }
+        defer {
+            activeLyricsRequests -= 1
+            if activeLyricsRequests == 0 {
+                webView.configuration.preferences.inactiveSchedulingPolicy = .throttle
+            }
+        }
         try await restoreSession()
         let value = try await webView.callAsyncJavaScript(Self.script,
             arguments: ["title": track.title, "artist": track.artist, "album": track.album, "duration": track.duration],

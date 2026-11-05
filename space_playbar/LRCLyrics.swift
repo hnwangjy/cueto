@@ -95,7 +95,7 @@ enum LRCLyrics {
         }.map(\.element)
     }
 
-    nonisolated static func line(at position: TimeInterval, in cues: [LyricCue]) -> String? {
+    nonisolated static func line(at position: TimeInterval, in cues: [LyricCue], bridgingGapsUpTo gapLimit: TimeInterval = 0) -> String? {
         guard position.isFinite else { return nil }
         var low = 0
         var high = cues.count
@@ -103,7 +103,14 @@ enum LRCLyrics {
             let middle = (low + high) / 2
             if cues[middle].time <= position { low = middle + 1 } else { high = middle }
         }
-        guard low > 0, !cues[low - 1].text.isEmpty else { return nil }
-        return cues[low - 1].text
+        guard low > 0 else { return nil }
+        let current = cues[low - 1]
+        if !current.text.isEmpty { return current.text }
+
+        // Keep the previous line visible across tiny gaps between timed lines.
+        guard gapLimit > 0, low >= 2, low < cues.count,
+              !cues[low].text.isEmpty, !cues[low - 2].text.isEmpty,
+              cues[low].time - current.time <= gapLimit else { return nil }
+        return cues[low - 2].text
     }
 }

@@ -8,9 +8,19 @@ enum AppleTTMLLyrics {
         parser.shouldResolveExternalEntities = false
         parser.delegate = reader
         guard parser.parse() else { return [] }
-        return reader.cues.enumerated().sorted {
-            $0.element.time == $1.element.time ? $0.offset < $1.offset : $0.element.time < $1.element.time
+        let lines = reader.lines.enumerated().sorted {
+            $0.element.cue.time == $1.element.cue.time ? $0.offset < $1.offset : $0.element.cue.time < $1.element.cue.time
         }.map(\.element)
+        var cues: [LyricCue] = []
+        for (index, line) in lines.enumerated() {
+            cues.append(line.cue)
+            // An earlier line ending must not clear a line that already started.
+            let nextStart = index + 1 < lines.count ? lines[index + 1].cue.time : .infinity
+            if let end = line.end, end.isFinite, end > line.cue.time, end < nextStart {
+                cues.append(LyricCue(time: end, text: ""))
+            }
+        }
+        return cues
     }
 
     nonisolated static func seconds(_ value: String) -> Double? {
@@ -22,7 +32,7 @@ enum AppleTTMLLyrics {
     }
 
     nonisolated private final class Reader: NSObject, XMLParserDelegate {
-        var cues: [LyricCue] = []
+        var lines: [(cue: LyricCue, end: Double?)] = []
         var begin: Double?
         var end: Double?
         var text = ""
@@ -56,8 +66,7 @@ enum AppleTTMLLyrics {
                 let line = text.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 if !line.isEmpty {
-                    cues.append(LyricCue(time: begin, text: line))
-                    if let end, end.isFinite, end > begin { cues.append(LyricCue(time: end, text: "")) }
+                    lines.append((LyricCue(time: begin, text: line), end))
                 }
             }
         }
