@@ -41,8 +41,11 @@ final class CuetoSettingsModel: ObservableObject {
 
     private let updater: SPUUpdater
 
-    init(updater: SPUUpdater) {
+    private let onManualUpdateCheck: () -> Void
+
+    init(updater: SPUUpdater, onManualUpdateCheck: @escaping () -> Void) {
         self.updater = updater
+        self.onManualUpdateCheck = onManualUpdateCheck
         refresh()
     }
 
@@ -77,6 +80,8 @@ final class CuetoSettingsModel: ObservableObject {
     }
 
     func checkForUpdates() {
+        guard updater.canCheckForUpdates else { return }
+        onManualUpdateCheck()
         updater.checkForUpdates()
     }
 

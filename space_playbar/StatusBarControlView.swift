@@ -585,6 +585,11 @@ private final class StatusBarNativeButton: NSButton {
     }
 
     private func drawSource(opacity: CGFloat) {
+        if isIdleState, let displayedSource, displayedSource.identifier == Self.idleSourceIdentifier {
+            drawSourceIdentity(displayedSource, countWidth: 0, xOffset: 0, opacity: opacity)
+            return
+        }
+
         let countWidth: CGFloat = sourceCount > 1 ? 19 : 0
         if sourceCount > 1 {
             let countRect = NSRect(x: 3, y: floor((bounds.height - 16) / 2), width: 16, height: 16)

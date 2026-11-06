@@ -29,7 +29,7 @@ final class AppleMusicLyricsMonitor: ObservableObject {
     private let directProbe = AppleMusicDirectProbe()
     @Published private(set) var isDirectConnected = false
     private var directConnectionObservation: AnyCancellable?
-    @Published private(set) var usesDirectLyrics = UserDefaults.standard.bool(forKey: "appleMusicDirectLyrics")
+    @Published private(set) var usesDirectLyrics = UserDefaults.standard.object(forKey: "appleMusicDirectLyrics") as? Bool ?? true
 
     func openDirectProbe() {
         usesDirectLyrics = true

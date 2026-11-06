@@ -5,7 +5,7 @@ import Sparkle
 import SwiftUI
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let excludedApps = ExcludedAudioApps()
     private lazy var playback = PlaybackController(excludedApps: excludedApps)
     private let subtitles = CosmosSubtitleMonitor()
@@ -26,7 +26,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApplication.shared.setActivationPolicy(.accessory)
-        _ = updaterController
+        let updater = updaterController.updater
+        if updater.automaticallyChecksForUpdates && updater.canCheckForUpdates {
+            updater.checkForUpdatesInBackground()
+        }
         notchPanelController = NotchPanelController(playback: playback, subtitles: subtitles, appleLyrics: appleLyrics) { [weak self] in
             self?.openCueto()
         }
@@ -135,7 +138,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ]
         if !hasActiveSession {
             let idleNameWidth = ceil(("Cueto" as NSString).size(withAttributes: attributes).width)
-            return 40 + idleNameWidth
+            return 48 + idleNameWidth
         }
         let nameWidth = ceil((applicationName as NSString).size(withAttributes: attributes).width)
         let countWidth: CGFloat = sourceCount > 1 ? 18 : 0
@@ -150,9 +153,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             model = existingModel
             windowController = existingWindowController
         } else {
-            model = CuetoSettingsModel(updater: updaterController.updater)
+            model = CuetoSettingsModel(updater: updaterController.updater) { [weak self] in
+                self?.settingsWindowController?.window?.level = .normal
+            }
             let rootView = CuetoSettingsView(model: model, excludedApps: excludedApps, subtitles: subtitles, appleLyrics: appleLyrics)
             let window = NSWindow(contentViewController: NSHostingController(rootView: rootView))
+            window.delegate = self
             window.title = "Cueto"
             window.styleMask = [.titled, .closable, .miniaturizable]
             window.level = .floating
@@ -171,6 +177,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         windowController.showWindow(nil)
         windowController.window?.makeKeyAndOrderFront(nil)
         windowController.window?.orderFrontRegardless()
+    }
+
+    func windowDidBecomeKey(_ notification: Notification) {
+        settingsWindowController?.window?.level = .floating
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
