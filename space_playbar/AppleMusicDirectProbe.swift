@@ -35,6 +35,7 @@ final class AppleMusicDirectProbe: NSObject, ObservableObject, WKNavigationDeleg
     var onSessionConnected: (() -> Void)?
     var onSessionDisconnected: (() -> Void)?
     private var window: NSWindow?
+    private var guideWindow: NSWindow?
     private var operation: Task<Void, Never>?
     private var sessionTimer: AnyCancellable?
     private var checkingSession = false
@@ -54,6 +55,26 @@ final class AppleMusicDirectProbe: NSObject, ObservableObject, WKNavigationDeleg
     }
 
     func open() {
+        if guideWindow == nil {
+            let guide = NSWindow(contentViewController: NSHostingController(
+                rootView: AppleMusicConnectionGuide(probe: self)))
+            guide.title = String(localized: "连接 Apple Music")
+            guide.styleMask = [.titled, .closable]
+            guide.setContentSize(NSSize(width: 420, height: 400))
+            guide.isReleasedWhenClosed = false
+            guide.center()
+            guideWindow = guide
+        }
+        guideWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func closeGuide() {
+        window?.close()
+        guideWindow?.close()
+    }
+
+    func openLoginPage() {
         startSessionObservation()
         prepareWindow()
         guard let window else { return }

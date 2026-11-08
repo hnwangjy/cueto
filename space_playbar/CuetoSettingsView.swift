@@ -258,6 +258,11 @@ struct CuetoSettingsView: View {
                         if !appleLyrics.isDirectConnected && appleLyrics.currentText == nil {
                             Button(String(localized: "连接…"), action: appleLyrics.openDirectProbe)
                                 .accessibilityLabel(String(localized: "连接 Apple Music"))
+                        } else {
+                            Button(action: appleLyrics.openDirectProbe) {
+                                Image(systemName: "ellipsis")
+                            }
+                            .accessibilityLabel(String(localized: "管理 Apple Music 连接…"))
                         }
                     }
                     .contextMenu {
