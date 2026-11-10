@@ -27,6 +27,34 @@ struct LRCLyricsTests {
         assert(negative == [LyricCue(time: 1.5, text: "Delayed")])
         let duplicate = LRCLyrics.parse("[00:02.00]A\n[00:02.00]B")
         assert(LRCLyrics.line(at: 2, in: duplicate) == "B")
+        let timeline = [LyricCue(time: 10, text: "First"), LyricCue(time: 14, text: ""),
+                        LyricCue(time: 20, text: "Second"), LyricCue(time: 25, text: ""),
+                        LyricCue(time: 25.2, text: "Third"), LyricCue(time: 30, text: "")]
+        assert(LRCLyrics.context(at: 0, in: timeline) == LyricContext(next: timeline[0]))
+        assert(LRCLyrics.context(at: 10, in: timeline) == LyricContext(current: timeline[0], next: timeline[2]))
+        assert(LRCLyrics.context(at: 16, in: timeline) == LyricContext(previous: timeline[0], next: timeline[2]))
+        assert(LRCLyrics.context(at: 20, in: timeline) == LyricContext(previous: timeline[0], current: timeline[2], next: timeline[4]))
+        assert(LRCLyrics.context(at: 25.1, in: timeline, bridgingGapsUpTo: 0.25).current == timeline[2])
+        assert(LRCLyrics.context(at: 40, in: timeline) == LyricContext(previous: timeline[4]))
+        assert(LRCLyrics.context(at: 2, in: duplicate).current?.text == "B")
+        assert(LRCLyrics.context(at: .nan, in: timeline) == LyricContext())
+        assert(LRCLyrics.context(at: 20, in: []).current == nil)
+        for offset in [-0.5, 0, 0.5] {
+            let target = LRCLyrics.seekPosition(for: timeline[2], in: timeline, timingOffset: offset, duration: 40)
+            let roundedDownPosition = floor(target * 1000) / 1000
+            assert(LRCLyrics.context(at: roundedDownPosition + offset, in: timeline).current == timeline[2])
+        }
+        let brief = [LyricCue(time: 1, text: "Short"), LyricCue(time: 1.01, text: "Next")]
+        let briefTarget = LRCLyrics.seekPosition(for: brief[0], in: brief, timingOffset: 0, duration: 40)
+        assert(briefTarget > 1 && briefTarget < 1.01)
+        assert(LRCLyrics.seekPosition(for: timeline[0], in: timeline, timingOffset: 20, duration: 40) == 0)
+        assert(LRCLyrics.seekPosition(for: timeline[2], in: timeline, timingOffset: -20, duration: 30) == 30)
+        // The same corrected position drives panel and menu-bar highlighting,
+        // including a backward seek and a positive (earlier display) offset.
+        for position in [24.9, 25.1, 10.0, 14.0, 0, 19.5 + 0.5] {
+            assert(LRCLyrics.context(at: position, in: timeline, bridgingGapsUpTo: 0.25).current?.text ==
+                   LRCLyrics.line(at: position, in: timeline, bridgingGapsUpTo: 0.25))
+        }
         let albumMatch = LyricMatchCandidate(trackName: "Example", artistName: "Previous Artist Name",
             albumName: "Collection", duration: 240, syncedLyrics: "[00:01]A", instrumental: false)
         assert(LyricMatching.select(title: "Example", artist: "New Artist Name", albumName: "Collection (Deluxe)",

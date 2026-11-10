@@ -99,13 +99,15 @@ struct NowPlayingPopover: View {
             let showsAppleLyrics = appleLyrics.isEnabled &&
                 (appleLyrics.isPlaying || playback.bundleIdentifier == "com.apple.Music")
             let text = showsAppleLyrics ? appleLyrics.currentText : subtitles.currentText
-            if showsAppleLyrics || text != nil {
+            if showsAppleLyrics {
+                AppleMusicLyricsPanel(lyrics: appleLyrics)
+            } else if let text {
                 VStack(alignment: .leading, spacing: 6) {
-                    Label(showsAppleLyrics ? String(localized: "Apple Music 歌词") : String(localized: "小宇宙字幕"), systemImage: "captions.bubble")
+                    Label(String(localized: "小宇宙字幕"), systemImage: "captions.bubble")
                         .font(.caption).foregroundStyle(.secondary)
-                    Text(text ?? (appleLyrics.showsMissingLyrics ? String(localized: "未读取到歌词") : ""))
+                    Text(text)
                         .font(.system(size: 13))
-                        .foregroundStyle(text == nil ? .secondary : .primary)
+                        .foregroundStyle(.primary)
                         .lineLimit(2, reservesSpace: true)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -169,6 +171,113 @@ struct NowPlayingPopover: View {
             return String(format: "%d:%02d:%02d", hours, minutes, seconds)
         }
         return String(format: "%d:%02d", minutes, seconds)
+    }
+}
+
+struct AppleMusicLyricsPanel: View {
+    @ObservedObject var lyrics: AppleMusicLyricsMonitor
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(String(localized: "Apple Music 歌词"), systemImage: "captions.bubble")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            if lyrics.hasTimedLyrics {
+                VStack(spacing: 2) {
+                    lyricRow(lyrics.lyricContext.previous, current: false)
+                    lyricRow(lyrics.lyricContext.current, current: true)
+                    lyricRow(lyrics.lyricContext.next, current: false)
+                }
+
+                if let error = lyrics.seekError {
+                    Text(error).font(.caption).foregroundStyle(.secondary)
+                }
+            } else {
+                Text(lyrics.showsMissingLyrics ? String(localized: "未读取到歌词") : "")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 40, alignment: .leading)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func lyricRow(_ cue: LyricCue?, current: Bool) -> some View {
+        Button {
+            if let cue { lyrics.seek(to: cue) }
+        } label: {
+            HStack(spacing: 8) {
+                Text(cue?.text ?? (current ? String(localized: "间奏") : ""))
+                    .font(.system(size: 13, weight: current ? .semibold : .regular))
+                    .foregroundStyle(current && cue != nil ? .primary : .secondary)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if let cue {
+                    Text(String(format: "%d:%02d", Int(cue.time) / 60, Int(cue.time) % 60))
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 40)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(LyricLineButtonStyle(current: current && cue != nil))
+        .disabled(cue == nil || lyrics.isSeeking)
+        .help(cue == nil ? "" : String(localized: "点击歌词跳转"))
+    }
+}
+
+struct LyricTimingControls: View {
+    @ObservedObject var lyrics: AppleMusicLyricsMonitor
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button {
+                lyrics.adjustTiming(by: 0.5)
+            } label: {
+                Label(String(localized: "提前"), systemImage: "minus")
+            }
+            .disabled(lyrics.timingOffset >= 10)
+            Spacer(minLength: 0)
+            Button(action: lyrics.resetTiming) {
+                Text(lyrics.timingOffset == 0 ? String(localized: "同步") :
+                        String(format: "%+.1f s", -lyrics.timingOffset))
+                    .monospacedDigit()
+                    .frame(minWidth: 52)
+            }
+            .disabled(lyrics.timingOffset == 0)
+            .help(String(localized: "恢复原始时间"))
+            Spacer(minLength: 0)
+            Button {
+                lyrics.adjustTiming(by: -0.5)
+            } label: {
+                Label(String(localized: "延后"), systemImage: "plus")
+            }
+            .disabled(lyrics.timingOffset <= -10)
+        }
+        .buttonStyle(.borderless)
+        .font(.system(size: 11, weight: .medium))
+        .padding(.horizontal, 4)
+        .frame(height: 26)
+    }
+}
+
+private struct LyricLineButtonStyle: ButtonStyle {
+    let current: Bool
+    @State private var hovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                current ? Color.accentColor.opacity(configuration.isPressed ? 0.18 : 0.10) :
+                    Color.primary.opacity(configuration.isPressed ? 0.10 : (hovered ? 0.05 : 0)),
+                in: RoundedRectangle(cornerRadius: 7)
+            )
+            .onHover { hovered = $0 }
     }
 }
 

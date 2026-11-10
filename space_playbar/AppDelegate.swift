@@ -161,10 +161,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             window.delegate = self
             window.title = "Cueto"
             window.styleMask = [.titled, .closable, .miniaturizable]
+            window.isOpaque = false
+            window.backgroundColor = .windowBackgroundColor
+            window.titlebarAppearsTransparent = false
+            window.titleVisibility = .visible
             window.level = .floating
             window.collectionBehavior.insert(.moveToActiveSpace)
-            window.setContentSize(NSSize(width: 500, height: 680))
-            window.minSize = NSSize(width: 440, height: 540)
+            window.setContentSize(NSSize(width: 780, height: 560))
+            window.minSize = NSSize(width: 720, height: 520)
             window.isReleasedWhenClosed = false
             window.center()
             windowController = NSWindowController(window: window)

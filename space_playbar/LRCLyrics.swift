@@ -1,8 +1,14 @@
 import Foundation
 
-struct LyricCue: Codable, Equatable, Sendable {
+nonisolated struct LyricCue: Codable, Equatable, Sendable {
     let time: TimeInterval
     let text: String
+}
+
+nonisolated struct LyricContext: Equatable, Sendable {
+    var previous: LyricCue?
+    var current: LyricCue?
+    var next: LyricCue?
 }
 
 struct LyricMatchCandidate: Decodable, Sendable {
@@ -96,6 +102,36 @@ enum LRCLyrics {
     }
 
     nonisolated static func line(at position: TimeInterval, in cues: [LyricCue], bridgingGapsUpTo gapLimit: TimeInterval = 0) -> String? {
+        activeIndex(at: position, in: cues, bridgingGapsUpTo: gapLimit).map { cues[$0].text }
+    }
+
+    nonisolated static func seekPosition(for cue: LyricCue, in cues: [LyricCue], timingOffset: TimeInterval, duration: TimeInterval) -> TimeInterval {
+        // Music may round a requested position down. Land just inside the cue
+        // so a paused seek does not remain in the preceding instrumental gap.
+        let next = cues.first { $0.time > cue.time }?.time ?? .infinity
+        let margin = min(0.03, (next - cue.time) / 2)
+        return min(duration, max(0, cue.time - timingOffset + margin))
+    }
+
+    nonisolated static func context(at position: TimeInterval, in cues: [LyricCue], bridgingGapsUpTo gapLimit: TimeInterval = 0) -> LyricContext {
+        guard position.isFinite else { return LyricContext() }
+        let active = activeIndex(at: position, in: cues, bridgingGapsUpTo: gapLimit)
+        // Keep timed silence markers out of the clickable rows, without turning
+        // an instrumental gap into an active lyric. Equal-time entries follow
+        // the same last-entry-wins rule as the menu-bar line lookup.
+        let lines = cues.indices.filter {
+            !cues[$0].text.isEmpty && ($0 + 1 == cues.count || cues[$0 + 1].time != cues[$0].time)
+        }
+        if let active {
+            return LyricContext(previous: lines.last { $0 < active }.map { cues[$0] },
+                                current: cues[active],
+                                next: lines.first { $0 > active }.map { cues[$0] })
+        }
+        return LyricContext(previous: lines.last { cues[$0].time <= position }.map { cues[$0] },
+                            next: lines.first { cues[$0].time > position }.map { cues[$0] })
+    }
+
+    nonisolated private static func activeIndex(at position: TimeInterval, in cues: [LyricCue], bridgingGapsUpTo gapLimit: TimeInterval) -> Int? {
         guard position.isFinite else { return nil }
         var low = 0
         var high = cues.count
@@ -105,12 +141,12 @@ enum LRCLyrics {
         }
         guard low > 0 else { return nil }
         let current = cues[low - 1]
-        if !current.text.isEmpty { return current.text }
+        if !current.text.isEmpty { return low - 1 }
 
         // Keep the previous line visible across tiny gaps between timed lines.
         guard gapLimit > 0, low >= 2, low < cues.count,
               !cues[low].text.isEmpty, !cues[low - 2].text.isEmpty,
               cues[low].time - current.time <= gapLimit else { return nil }
-        return cues[low - 2].text
+        return low - 2
     }
 }

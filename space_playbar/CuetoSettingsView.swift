@@ -116,123 +116,165 @@ struct CuetoSettingsView: View {
         return String(localized: "版本 \(version)（\(build)）")
     }
 
+    private enum Section: String, CaseIterable, Identifiable {
+        case general, lyrics, hiddenApps, experiments
+        var id: Self { self }
+        var title: String {
+            switch self {
+            case .general: String(localized: "通用")
+            case .lyrics: String(localized: "歌词")
+            case .hiddenApps: String(localized: "隐藏应用")
+            case .experiments: String(localized: "实验功能")
+            }
+        }
+        var icon: String {
+            switch self {
+            case .general: "gearshape"
+            case .lyrics: "captions.bubble"
+            case .hiddenApps: "eye.slash"
+            case .experiments: "flask"
+            }
+        }
+    }
+
+    @State private var selectedSection: Section? = .general
+    @FocusState private var focusedSection: Section?
+
     var body: some View {
-        ScrollView {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack(spacing: 14) {
-                if let icon = NSApplication.shared.applicationIconImage {
-                    Image(nsImage: icon)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 48, height: 48)
-                }
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Cueto")
-                        .font(.system(size: 22, weight: .semibold))
-                }
-            }
-
-            sectionHeading(String(localized: "通用"))
-            VStack(spacing: 0) {
-                settingRow(
-                    icon: "power",
-                    title: String(localized: "登录时自动启动")
-                ) {
-                    Toggle("", isOn: Binding(
-                        get: { model.launchAtLogin },
-                        set: model.setLaunchAtLogin
-                    ))
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                }
-
-                Divider().padding(.leading, 44)
-
-                settingRow(
-                    icon: "arrow.triangle.2.circlepath",
-                    title: String(localized: "自动检查更新")
-                ) {
-                    Toggle("", isOn: Binding(
-                        get: { model.automaticallyChecksForUpdates },
-                        set: model.setAutomaticallyChecksForUpdates
-                    ))
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                }
-
-            }
-            .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-            sectionHeading(String(localized: "实验功能"), experimental: true)
-            VStack(alignment: .leading, spacing: 0) {
-                settingRow(
-                    icon: "captions.bubble",
-                    title: String(localized: "菜单栏字幕 · 小宇宙")
-                ) {
-                    Toggle("", isOn: $subtitles.isEnabled)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                }
-
-                Text(String(localized: "跨桌面时字幕可能停止更新。"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.horizontal, 14)
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(String(localized: "设置"))
+                    .font(.system(size: 17, weight: .semibold))
+                    .padding(.horizontal, 20)
+                    .padding(.top, 22)
                     .padding(.bottom, 12)
 
-                if subtitles.isEnabled || appleLyrics.isEnabled {
-                    HStack(spacing: 16) {
-                        Text(String(localized: "字幕宽度")).font(.system(size: 12))
-                        Spacer(minLength: 0)
-                        Picker(String(localized: "字幕宽度"), selection: $subtitles.width) {
-                            ForEach(SubtitleWidth.allCases, id: \.self) { width in
-                                Text(width.title).tag(width)
+                VStack(spacing: 3) {
+                    ForEach(Section.allCases) { section in
+                        Button {
+                            selectedSection = section
+                            focusedSection = section
+                        } label: {
+                            Label {
+                                Text(section.title)
+                                    .font(.system(size: 13, weight: selectedSection == section ? .medium : .regular))
+                            } icon: {
+                                Image(systemName: section.icon)
+                                    .symbolVariant(selectedSection == section ? .fill : .none)
+                                    .font(.system(size: 13))
+                                    .frame(width: 18)
                             }
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.segmented)
-                        .frame(width: 180)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 12)
-                }
-
-                if subtitles.isEnabled && subtitles.currentText == nil {
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: subtitles.needsPermission ? "lock.circle" : "info.circle")
-                        Text(subtitles.statusMessage)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Spacer(minLength: 0)
-                        if subtitles.needsPermission {
-                            Button(String(localized: "授权…"), action: subtitles.requestPermission)
-                                .controlSize(.small)
-                        }
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(12)
-                    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 12)
-                }
-
-                if let text = subtitles.currentText {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(text).font(.system(size: 13)).lineLimit(3)
-                            .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 10)
+                            .frame(height: 32)
+                            .contentShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(SettingsSidebarButtonStyle(isSelected: selectedSection == section))
+                        .focusable()
+                        .focusEffectDisabled()
+                        .focused($focusedSection, equals: section)
+                        .onMoveCommand { direction in
+                            guard direction == .up || direction == .down,
+                                  let index = Section.allCases.firstIndex(of: section) else { return }
+                            let next = min(max(index + (direction == .down ? 1 : -1), 0), Section.allCases.count - 1)
+                            focusedSection = Section.allCases[next]
+                            selectedSection = Section.allCases[next]
+                        }
+                        .accessibilityAddTraits(selectedSection == section ? [.isSelected] : [])
                     }
-                    .padding(12)
-                    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 12)
                 }
+                .padding(.horizontal, 12)
+                Spacer(minLength: 0)
+                Text(versionText)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 18)
+            }
+            .frame(width: 190)
+            .background(SettingsWindowMaterial(material: .sidebar))
 
-                Divider().padding(.leading, 44)
+            Rectangle().fill(.primary.opacity(0.06)).frame(width: 1)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 30) {
+                    HStack(spacing: 8) {
+                        Text((selectedSection ?? .general).title)
+                            .font(.system(size: 24, weight: .semibold))
+                        if selectedSection == .experiments {
+                            Text("BETA")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(Color.accentColor)
+                                .padding(.horizontal, 6).padding(.vertical, 3)
+                                .background(Color.accentColor.opacity(0.12), in: Capsule())
+                        }
+                    }
+                    switch selectedSection ?? .general {
+                    case .general: generalSettings
+                    case .lyrics: lyricsSettings
+                    case .hiddenApps: hiddenAppSettings
+                    case .experiments: experimentalSettings
+                    }
+                }
+                .padding(32)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(nsColor: .textBackgroundColor).opacity(0.88))
+        }
+        .background(SettingsWindowMaterial())
+        .frame(minWidth: 660, minHeight: 500)
+        .onAppear {
+            model.refresh()
+            runningApps = NSWorkspace.shared.runningApplications
+        }
+        .onChange(of: selectedSection) { _, _ in
+            model.refresh()
+            runningApps = NSWorkspace.shared.runningApplications
+        }
+    }
+
+    private var generalSettings: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(spacing: 0) {
+                settingRow(title: String(localized: "登录时自动启动")) {
+                    Toggle("", isOn: Binding(get: { model.launchAtLogin }, set: model.setLaunchAtLogin))
+                        .labelsHidden().toggleStyle(.switch)
+                        .accessibilityLabel(String(localized: "登录时自动启动"))
+                }
+                Divider().padding(.horizontal, 16)
+                settingRow(title: String(localized: "自动检查更新")) {
+                    Toggle("", isOn: Binding(get: { model.automaticallyChecksForUpdates }, set: model.setAutomaticallyChecksForUpdates))
+                        .labelsHidden().toggleStyle(.switch)
+                        .accessibilityLabel(String(localized: "自动检查更新"))
+                }
+            }
+            .modifier(SettingsCardMaterial())
+            if model.requiresLoginItemApproval {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange)
+                    Text(String(localized: "需要在系统设置的“登录项”中允许 Cueto。")).font(.caption)
+                    Spacer()
+                    Button(String(localized: "打开系统设置"), action: model.openLoginItemsSettings)
+                }
+            }
+            if let errorMessage = model.errorMessage {
+                Text(errorMessage).font(.caption).foregroundStyle(.red)
+            }
+            HStack {
+                Spacer()
+                Button(String(localized: "立即检查更新"), action: model.checkForUpdates)
+                    .disabled(!model.canCheckForUpdates)
+                    .keyboardShortcut("u", modifiers: [.command])
+            }
+        }
+    }
+
+    private var lyricsSettings: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 0) {
 #if CUETO_APPLE_MUSIC_LYRICS
-                settingRow(icon: "music.note", title: String(localized: "Apple Music 歌词")) {
+                settingRow(title: String(localized: "Apple Music 歌词")) {
                     Toggle("", isOn: $appleLyrics.isEnabled)
                         .labelsHidden().toggleStyle(.switch)
                 }
@@ -241,7 +283,7 @@ struct CuetoSettingsView: View {
                         Text(String(localized: "歌曲信息发送至 LRCLIB，歌词缓存在本机。"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            .padding(.leading, 44)
+                            .padding(.leading, 14)
                             .padding(.trailing, 14)
                     }
                     HStack(spacing: 12) {
@@ -275,28 +317,109 @@ struct CuetoSettingsView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
                     .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
-                    .padding(.leading, 44)
+                    .padding(.leading, 14)
                     .padding(.trailing, 14)
                     .padding(.bottom, 12)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(String(localized: "歌词校时"))
+                            .font(.system(size: 12, weight: .medium))
+                        LyricTimingControls(lyrics: appleLyrics)
+                            .disabled(!appleLyrics.hasTimedLyrics)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 14)
                 }
-                Divider().padding(.leading, 44)
 #endif
+            }
+            .modifier(SettingsCardMaterial())
+            VStack(alignment: .leading, spacing: 0) {
+                if subtitles.isEnabled || appleLyrics.isEnabled {
+                    HStack(spacing: 16) {
+                        Text(String(localized: "字幕宽度")).font(.system(size: 12))
+                        Spacer(minLength: 0)
+                        Picker(String(localized: "字幕宽度"), selection: $subtitles.width) {
+                            ForEach(SubtitleWidth.allCases, id: \.self) { width in
+                                Text(width.title).tag(width)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.segmented)
+                        .frame(width: 180)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 12)
+                }
+
+
+            }
+        }
+    }
+
+    private var experimentalSettings: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 0) {
                 settingRow(
-                    icon: "macbook",
-                    title: String(localized: "灵动岛面板")
+                    title: String(localized: "菜单栏字幕 · 小宇宙")
                 ) {
-                    Toggle("", isOn: $openPanelAtNotch)
+                    Toggle("", isOn: $subtitles.isEnabled)
                         .labelsHidden()
                         .toggleStyle(.switch)
-                        .help(String(localized: "悬停 MacBook 刘海展开，移开后收起"))
                 }
-            }
-            .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
 
+                Text(String(localized: "跨桌面时字幕可能停止更新。"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 12)
+
+                if subtitles.isEnabled && subtitles.currentText == nil {
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: subtitles.needsPermission ? "lock.circle" : "info.circle")
+                        Text(subtitles.statusMessage)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 0)
+                        if subtitles.needsPermission {
+                            Button(String(localized: "授权…"), action: subtitles.requestPermission)
+                                .controlSize(.small)
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(12)
+                    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 12)
+                }
+
+                if let text = subtitles.currentText {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(text).font(.system(size: 13)).lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .padding(12)
+                    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 12)
+                }
+
+
+            }
+            .modifier(SettingsCardMaterial())
+            settingRow(title: String(localized: "灵动岛面板")) {
+                Toggle("", isOn: $openPanelAtNotch)
+                    .labelsHidden().toggleStyle(.switch)
+                    .accessibilityLabel(String(localized: "灵动岛面板"))
+                    .help(String(localized: "悬停 MacBook 刘海展开，移开后收起"))
+            }
+            .modifier(SettingsCardMaterial())
+        }
+    }
+
+    private var hiddenAppSettings: some View {
             VStack(alignment: .leading, spacing: 9) {
                 HStack {
-                    Text(String(localized: "隐藏应用"))
-                        .font(.system(size: 13, weight: .semibold))
                     Spacer()
                     Button(String(localized: "添加应用…"), action: chooseApplication)
                         .controlSize(.small)
@@ -327,62 +450,10 @@ struct CuetoSettingsView: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(height: 130)
-                .background(.quaternary.opacity(0.55), in: RoundedRectangle(cornerRadius: 10))
+                .frame(height: 300)
+                .modifier(SettingsCardMaterial())
             }
 
-            if model.requiresLoginItemApproval {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Image(systemName: "exclamationmark.circle.fill")
-                        .foregroundStyle(.orange)
-                    Text(String(localized: "需要在系统设置的“登录项”中允许 Cueto。"))
-                        .font(.caption)
-                    Spacer()
-                    Button(String(localized: "打开系统设置"), action: model.openLoginItemsSettings)
-                        .controlSize(.small)
-                }
-            }
-
-            if let errorMessage = model.errorMessage {
-                Text(errorMessage)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-            }
-
-            HStack {
-                Text(versionText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button(String(localized: "立即检查更新"), action: model.checkForUpdates)
-                    .disabled(!model.canCheckForUpdates)
-                    .keyboardShortcut("u", modifiers: [.command])
-            }
-        }
-        .padding(24)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .frame(minWidth: 440, minHeight: 520)
-        .onAppear {
-            model.refresh()
-            runningApps = NSWorkspace.shared.runningApplications
-        }
-    }
-
-    private func sectionHeading(_ title: String, experimental: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 7) {
-                Text(title).font(.system(size: 13, weight: .semibold))
-                if experimental {
-                    Text("BETA")
-                        .font(.system(size: 9, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.accentColor)
-                        .padding(.horizontal, 6).padding(.vertical, 3)
-                        .background(Color.accentColor.opacity(0.12), in: Capsule())
-                }
-            }
-        }
-        .padding(.horizontal, 2)
     }
 
     private func chooseApplication() {
@@ -402,18 +473,11 @@ struct CuetoSettingsView: View {
     }
 
     private func settingRow<Accessory: View>(
-        icon: String,
         title: String,
         detail: String? = nil,
         @ViewBuilder accessory: () -> Accessory
     ) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
-                .frame(width: 32, height: 32)
-                .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 13, weight: .medium))
@@ -429,7 +493,55 @@ struct CuetoSettingsView: View {
             accessory()
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 12)
+        .padding(.vertical, 17)
+    }
+}
+
+private struct SettingsSidebarButtonStyle: ButtonStyle {
+    let isSelected: Bool
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isHovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        let pressed = configuration.isPressed && isEnabled
+        let hovered = isHovered && isEnabled
+        let opacity: Double = pressed ? 0.13 : (isSelected ? (hovered ? 0.085 : 0.055) : (hovered ? 0.035 : 0))
+        configuration.label
+            .foregroundStyle(Color.primary.opacity(isSelected || hovered || pressed ? 1 : 0.72))
+            .background(Color.primary.opacity(opacity), in: RoundedRectangle(cornerRadius: 8))
+            .opacity(isEnabled ? 1 : 0.45)
+            .onHover { isHovered = $0 }
+            .onDisappear { isHovered = false }
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isHovered)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.08), value: configuration.isPressed)
+    }
+}
+
+private struct SettingsCardMaterial: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background(Color(nsColor: .controlBackgroundColor).opacity(0.4), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .strokeBorder(.primary.opacity(0.09), lineWidth: 0.5)
+            }
+    }
+}
+
+private struct SettingsWindowMaterial: NSViewRepresentable {
+    var material: NSVisualEffectView.Material = .underWindowBackground
+
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = material
+        view.blendingMode = .behindWindow
+        view.state = .active
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {
+        view.material = material
     }
 }
 #endif

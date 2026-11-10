@@ -98,6 +98,72 @@ final class AppleMusicLyricsMonitor: ObservableObject {
         }
     }
     @Published private(set) var currentText: String?
+    @Published private(set) var lyricContext = LyricContext()
+    @Published private(set) var timingOffset: TimeInterval = 0
+    @Published private(set) var isSeeking = false
+    @Published private(set) var seekError: String?
+    private var timingOffsets = UserDefaults.standard.dictionary(forKey: "appleMusicLyricTimingOffsets") as? [String: Double] ?? [:]
+
+    var hasTimedLyrics: Bool { !cues.isEmpty && snapshot != nil }
+
+    private func offsetKey(for song: MusicSnapshot) -> String {
+        SHA256.hash(data: Data(song.key.utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
+    func adjustTiming(by amount: TimeInterval) {
+        guard let snapshot, hasTimedLyrics, amount.isFinite else { return }
+        timingOffset = min(10, max(-10, ((timingOffset + amount) * 2).rounded() / 2))
+        let key = offsetKey(for: snapshot)
+        timingOffsets[key] = timingOffset == 0 ? nil : timingOffset
+        UserDefaults.standard.set(timingOffsets, forKey: "appleMusicLyricTimingOffsets")
+        updateLine()
+    }
+
+    func resetTiming() { adjustTiming(by: -timingOffset) }
+
+    func seek(to cue: LyricCue) {
+        guard let song = snapshot, cues.contains(cue), !cue.text.isEmpty, !isSeeking else { return }
+        let target = LRCLyrics.seekPosition(for: cue, in: cues, timingOffset: timingOffset, duration: song.duration)
+        let token = generation
+        isSeeking = true
+        seekError = nil
+        reader.async { [weak self] in
+            // Target Music directly, preserving paused/playing state. Verify the
+            // track before seeking so a stale row cannot seek a newly started song.
+            func quoted(_ value: String) -> String {
+                "\"" + value.replacingOccurrences(of: "\\", with: "\\\\")
+                    .replacingOccurrences(of: "\"", with: "\\\"") + "\""
+            }
+            let script = """
+            with timeout of 2 seconds
+                tell application id "com.apple.Music"
+                    if not running then return false
+                    if player state is stopped then return false
+                    if persistent ID of current track is not \(quoted(song.identifier)) then return false
+                    if name of current track is not \(quoted(song.title)) then return false
+                    set player position to \(target)
+                    return true
+                end tell
+            end timeout
+            """
+            var error: NSDictionary?
+            let succeeded = NSAppleScript(source: script)?.executeAndReturnError(&error).booleanValue == true && error == nil
+            let (state, _, _) = Self.readMusic(includeUpcoming: false)
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.isSeeking = false
+                guard self.generation == token, self.snapshot?.key == song.key else { return }
+                if succeeded, let state, state.key == song.key {
+                    self.snapshot = state
+                    self.isPlaying = state.playing
+                    self.updateLine()
+                } else {
+                    self.seekError = String(localized: "未能跳转，请重试")
+                }
+                self.poll()
+            }
+        }
+    }
     var showsMissingLyrics: Bool {
         !loading && snapshot != nil && cues.isEmpty && !statusMessage.isEmpty
     }
@@ -109,8 +175,20 @@ final class AppleMusicLyricsMonitor: ObservableObject {
     private let reader = DispatchQueue(label: "com.wangjiayuan.cueto.apple-music", qos: .utility)
     private var reading = false
     private var generation = UUID()
-    private var snapshot: MusicSnapshot?
-    private var cues: [LyricCue] = []
+    private var snapshot: MusicSnapshot? {
+        didSet {
+            guard oldValue?.key != snapshot?.key else { return }
+            timingOffset = snapshot.map { song in
+                let saved = timingOffsets[offsetKey(for: song)] ?? 0
+                return saved.isFinite ? min(10, max(-10, saved)) : 0
+            } ?? 0
+            seekError = nil
+            lyricContext = LyricContext()
+        }
+    }
+    private var cues: [LyricCue] = [] {
+        didSet { if cues.isEmpty { lyricContext = LyricContext() } }
+    }
     private var request: Task<Void, Never>?
     @Published private var loading = false
     private var recovery = LyricsRecoverySchedule()
@@ -181,7 +259,7 @@ final class AppleMusicLyricsMonitor: ObservableObject {
     }
 
     private func poll() {
-        guard isEnabled, !reading, !needsPermission else { return }
+        guard isEnabled, !reading, !isSeeking, !needsPermission else { return }
         guard NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.Music").contains(where: { !$0.isTerminated }) else {
             if snapshot != nil { generation = UUID(); request?.cancel(); snapshot = nil; cues = []; resetRecoveryAndPrefetch() }
             currentText = nil
@@ -247,8 +325,10 @@ final class AppleMusicLyricsMonitor: ObservableObject {
         // Do not keep advancing indefinitely if Music stops answering.
         let position = snapshot.position + (snapshot.playing ? min(max(elapsed, 0), 1.2) : 0)
         // Lead the visual transition slightly while playback is advancing.
-        let displayPosition = position + (snapshot.playing ? 0.30 : 0)
-        let text = LRCLyrics.line(at: min(displayPosition, snapshot.duration), in: cues, bridgingGapsUpTo: usesDirectLyrics ? 0.25 : 0)
+        let displayPosition = min(position + (snapshot.playing ? 0.30 : 0) + timingOffset, snapshot.duration)
+        let context = LRCLyrics.context(at: displayPosition, in: cues, bridgingGapsUpTo: usesDirectLyrics ? 0.25 : 0)
+        let text = context.current?.text
+        if lyricContext != context { lyricContext = context }
         if currentText != text { currentText = text }
     }
 
@@ -442,6 +522,14 @@ import Combine
 /// regardless of preferences saved by an earlier development build.
 @MainActor
 final class AppleMusicLyricsMonitor: ObservableObject {
+    var hasTimedLyrics: Bool { false }
+    var lyricContext: LyricContext { LyricContext() }
+    var timingOffset: TimeInterval { 0 }
+    var isSeeking: Bool { false }
+    var seekError: String? { nil }
+    func adjustTiming(by amount: TimeInterval) {}
+    func resetTiming() {}
+    func seek(to cue: LyricCue) {}
     var showsMissingLyrics: Bool { false }
     @Published private(set) var isEnabled = false
     @Published private(set) var currentText: String? = nil

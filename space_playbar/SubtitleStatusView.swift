@@ -8,7 +8,7 @@ final class SubtitleStatusView: NSButton {
     private var currentText = ""
     private var textContainer: CALayer?
     private var primaryText: CATextLayer?
-    private static let textFont = NSFont.systemFont(ofSize: 13, weight: .medium)
+    private static let textFont = NSFont.systemFont(ofSize: 13, weight: .bold)
 
     private static let leadingInset: CGFloat = 6
     private static let trailingInset: CGFloat = 10
