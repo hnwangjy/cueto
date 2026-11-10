@@ -2397,6 +2397,135 @@
           }
         }
       }
+    },
+    "·": {},
+    "仅在诊断报告确认已知的后台锁异常后重新打开，不发送播放指令。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reopen only when a diagnostic report confirms the known background lock error. No playback command is sent."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅在诊断报告确认已知的后台锁异常后重新打开，不发送播放指令。"
+          }
+        }
+      }
+    },
+    "小宇宙": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xiaoyuzhou"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "小宇宙"
+          }
+        }
+      }
+    },
+    "小宇宙异常退出后自动恢复": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recover Xiaoyuzhou after an unexpected exit"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "小宇宙异常退出后自动恢复"
+          }
+        }
+      }
+    },
+    "小宇宙连续异常退出，已暂停本次自动恢复。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xiaoyuzhou has exited repeatedly. This recovery attempt was skipped."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "小宇宙连续异常退出，已暂停本次自动恢复。"
+          }
+        }
+      }
+    },
+    "已重新打开小宇宙": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reopened Xiaoyuzhou"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已重新打开小宇宙"
+          }
+        }
+      }
+    },
+    "找不到小宇宙，请手动打开。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xiaoyuzhou could not be located. Open it manually."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找不到小宇宙，请手动打开。"
+          }
+        }
+      }
+    },
+    "无法读取系统诊断报告，自动恢复暂不可用。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostic reports are unavailable. Automatic recovery is currently disabled."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取系统诊断报告，自动恢复暂不可用。"
+          }
+        }
+      }
+    },
+    "未能重新打开小宇宙，请手动打开。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not reopen Xiaoyuzhou. Open it manually."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未能重新打开小宇宙，请手动打开。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

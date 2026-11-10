@@ -16,9 +16,9 @@ enum SubtitleWidth: String, CaseIterable {
 
     var points: CGFloat {
         switch self {
-        case .short: return 160
-        case .medium: return 200
-        case .long: return 280
+        case .short: return 120
+        case .medium: return 160
+        case .long: return 220
         }
     }
 }

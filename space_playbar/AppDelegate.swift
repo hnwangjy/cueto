@@ -10,8 +10,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private lazy var playback = PlaybackController(excludedApps: excludedApps)
     private let subtitles = CosmosSubtitleMonitor()
     private let appleLyrics = AppleMusicLyricsMonitor()
+    private let cosmosRecovery = CosmosCrashRecoveryMonitor()
     private var subtitleStatusItem: NSStatusItem?
     private var subtitleObservations = Set<AnyCancellable>()
+    private var lastSubtitleContent: MenuBarSubtitleContent?
+    private var lastSubtitleWidth: CGFloat?
+    private var subtitleContinuity = MenuBarSubtitleContinuity()
+    private var subtitleFallbackTask: Task<Void, Never>?
+    private var scheduledSubtitleRefresh: Date?
     private var statusItem: NSStatusItem?
     private var statusControlView: StatusBarControlView?
     private var statusItemObservation: AnyCancellable?
@@ -70,23 +76,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
         self.statusControlView = controlView
         self.statusItem = item
-        subtitles.$currentText
-            .combineLatest(appleLyrics.$currentText, subtitles.$width)
-            .combineLatest(appleLyrics.$isPlaying, playback.$bundleIdentifier)
+        Publishers.Merge3(subtitles.objectWillChange, appleLyrics.objectWillChange, playback.objectWillChange)
             .receive(on: RunLoop.main)
-            .sink { [weak self] values, playing, source in
-                guard let self else { return }
-                let showsAppleLyrics = appleLyrics.isEnabled && (playing || source == "com.apple.Music")
-                let text = showsAppleLyrics ? values.1 : values.0
-                let maximumWidth = values.2.points
-                let width = if showsAppleLyrics, let text {
-                    min(maximumWidth, SubtitleStatusView.fittingWidth(for: text))
-                } else {
-                    maximumWidth
-                }
-                updateSubtitleItem(text, width: width, subtleTransition: showsAppleLyrics)
-            }
+            .sink { [weak self] _ in self?.refreshSubtitleItem() }
             .store(in: &subtitleObservations)
+        refreshSubtitleItem()
         statusItemObservation = playback.$applicationName
             .combineLatest(playback.$hasActiveSession, playback.$activeAudioSources)
             .sink { [weak item, weak controlView] name, hasActiveSession, sources in
@@ -104,8 +98,58 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         statusControlView?.handleStatusItemEvent(NSApp.currentEvent)
     }
 
-    private func updateSubtitleItem(_ text: String?, width: CGFloat, subtleTransition: Bool) {
-        guard let text, !text.isEmpty else {
+    private func refreshSubtitleItem() {
+        let source = playback.bundleIdentifier
+        let showsApple = appleLyrics.isEnabled && (appleLyrics.isPlaying || source == "com.apple.Music")
+        let showsCosmos = subtitles.isEnabled && (subtitles.currentText != nil || source == "app.podcast.cosmos")
+        let content: MenuBarSubtitleContent?
+        let identity: [String?]
+        if showsApple {
+            let title = appleLyrics.currentTrackTitle ?? (source == "com.apple.Music" ? playback.title : nil)
+            let artist = appleLyrics.currentTrackArtist ?? (source == "com.apple.Music" ? playback.artist : nil)
+            content = .make(lyric: appleLyrics.currentText,
+                title: title, artist: artist,
+                sourceIdentifier: "com.apple.Music", sourceName: "Apple Music",
+                scrollTimeBudget: appleLyrics.currentLyricRemainingTime)
+            identity = ["com.apple.Music", title, artist]
+        } else if showsCosmos {
+            let title = source == "app.podcast.cosmos" ? playback.title : nil
+            let artist = source == "app.podcast.cosmos" ? playback.artist : nil
+            content = .make(lyric: subtitles.currentText,
+                title: title, artist: artist,
+                sourceIdentifier: "app.podcast.cosmos", sourceName: String(localized: "小宇宙"))
+            identity = ["app.podcast.cosmos", title, artist]
+        } else {
+            content = nil
+            identity = []
+        }
+        let resolved = subtitleContinuity.resolve(content, trackIdentity: identity, at: Date(),
+            hasEnteredLyrics: showsApple && (appleLyrics.lyricContext.previous != nil || appleLyrics.lyricContext.current != nil))
+        if let deadline = subtitleContinuity.refreshAt {
+            if scheduledSubtitleRefresh != deadline {
+                subtitleFallbackTask?.cancel()
+                scheduledSubtitleRefresh = deadline
+                subtitleFallbackTask = Task { [weak self] in
+                    do { try await Task.sleep(for: .seconds(max(0, deadline.timeIntervalSinceNow))) }
+                    catch { return }
+                    guard let self, !Task.isCancelled else { return }
+                    self.scheduledSubtitleRefresh = nil
+                    self.refreshSubtitleItem()
+                }
+            }
+        } else {
+            subtitleFallbackTask?.cancel()
+            subtitleFallbackTask = nil
+            scheduledSubtitleRefresh = nil
+        }
+        updateSubtitleItem(resolved, width: subtitles.width.points)
+    }
+
+    private func updateSubtitleItem(_ content: MenuBarSubtitleContent?, width: CGFloat) {
+        guard content != lastSubtitleContent || width != lastSubtitleWidth else { return }
+        lastSubtitleContent = content
+        lastSubtitleWidth = width
+        guard let content else {
             if let item = subtitleStatusItem { NSStatusBar.system.removeStatusItem(item) }
             subtitleStatusItem = nil
             return
@@ -123,7 +167,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         item.length = width
         item.view?.setFrameSize(NSSize(width: width, height: NSStatusBar.system.thickness))
-        (item.view as? SubtitleStatusView)?.show(text, subtleTransition: subtleTransition)
+        (item.view as? SubtitleStatusView)?.show(content)
     }
 
     @objc private func openSubtitleSettings() { openCueto() }
@@ -142,7 +186,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         let nameWidth = ceil((applicationName as NSString).size(withAttributes: attributes).width)
         let countWidth: CGFloat = sourceCount > 1 ? 18 : 0
-        return min(max(136 + countWidth + nameWidth, 174), 246)
+        return min(max(128 + countWidth + nameWidth, 164), 246)
     }
 
     private func openCueto() {
@@ -156,7 +200,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             model = CuetoSettingsModel(updater: updaterController.updater) { [weak self] in
                 self?.settingsWindowController?.window?.level = .normal
             }
-            let rootView = CuetoSettingsView(model: model, excludedApps: excludedApps, subtitles: subtitles, appleLyrics: appleLyrics)
+            let rootView = CuetoSettingsView(model: model, excludedApps: excludedApps, subtitles: subtitles, appleLyrics: appleLyrics, cosmosRecovery: cosmosRecovery)
             let window = NSWindow(contentViewController: NSHostingController(rootView: rootView))
             window.delegate = self
             window.title = "Cueto"

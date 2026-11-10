@@ -2,20 +2,19 @@
 import AppKit
 import QuartzCore
 
-/// Draws and animates text inside the menu-bar item.
+/// A stable-width menu-bar lyric line with one consistent fade transition.
 @MainActor
 final class SubtitleStatusView: NSButton {
-    private var currentText = ""
+    private var content: MenuBarSubtitleContent?
     private var textContainer: CALayer?
     private var primaryText: CATextLayer?
+    private var scrollPlan: SubtitleScrollPlan?
+    private var scrollBeganAt: CFTimeInterval?
+    private var frozenReadingOffset: CGFloat = 0
+    private var contentReceivedAt: CFTimeInterval = 0
+    private var scrollTimer: Timer?
     private static let textFont = NSFont.systemFont(ofSize: 13, weight: .bold)
-
-    private static let leadingInset: CGFloat = 6
-    private static let trailingInset: CGFloat = 10
-
-    static func fittingWidth(for text: String) -> CGFloat {
-        textWidth(for: text) + leadingInset + trailingInset
-    }
+    private static let horizontalInset: CGFloat = 4
 
     private static func textWidth(for text: String) -> CGFloat {
         ceil((text as NSString).size(withAttributes: [.font: textFont]).width) + 2
@@ -40,39 +39,33 @@ final class SubtitleStatusView: NSButton {
         if changed { render(transition: false, offset: offset) }
     }
 
-    func show(_ text: String, subtleTransition: Bool) {
-        guard currentText != text else { return }
-        // Growing the same sentence should continue from the visible words.
-        if !currentText.isEmpty, text.hasPrefix(currentText) {
-            let offset = readingOffset
-            currentText = text
-            toolTip = text
-            setAccessibilityValue(text)
-            render(transition: false, offset: offset)
-            return
-        }
-        // The panel and menu bar must advance on the same source update.
-        // Never postpone the next sentence to finish a previous scroll.
-        present(text, subtleTransition: subtleTransition)
+    func show(_ next: MenuBarSubtitleContent) {
+        guard content != next else { return }
+        let extendsCurrentLine = content.map {
+            !$0.isMetadata && !$0.text.isEmpty && !next.isMetadata && $0.sourceIdentifier == next.sourceIdentifier && next.text.hasPrefix($0.text)
+        } ?? false
+        let offset = extendsCurrentLine ? readingOffset : 0
+        content = next
+        contentReceivedAt = CACurrentMediaTime()
+        toolTip = next.text
+        setAccessibilityValue(next.text)
+        render(transition: !extendsCurrentLine, offset: offset)
     }
 
     private var readingOffset: CGFloat {
-        guard let text = primaryText else { return 0 }
-        return max(0, -(text.presentation() ?? text).transform.m41)
-    }
-
-    private func present(_ text: String, subtleTransition: Bool) {
-        currentText = text
-        toolTip = text
-        setAccessibilityValue(text)
-        render(transition: true, subtleTransition: subtleTransition)
+        guard let plan = scrollPlan, let beganAt = scrollBeganAt else { return frozenReadingOffset }
+        return CGFloat(plan.offset(at: CACurrentMediaTime() - beganAt))
     }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
         if window == nil {
-            layer?.sublayers?.forEach { $0.removeAllAnimations() }
-            textContainer?.sublayers?.forEach { $0.removeAllAnimations() }
+            frozenReadingOffset = readingOffset
+            scrollBeganAt = nil
+            scrollTimer?.invalidate()
+            scrollTimer = nil
+            textContainer?.removeAllAnimations()
+            primaryText?.removeAllAnimations()
         } else {
             render(transition: false, offset: readingOffset)
         }
@@ -83,108 +76,101 @@ final class SubtitleStatusView: NSButton {
         render(transition: false, offset: readingOffset)
     }
 
-    private func render(transition: Bool, offset: CGFloat = 0, subtleTransition: Bool = false) {
-        guard let layer, !currentText.isEmpty else { return }
-        let reduced = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
-        // An interrupted sentence transition must not leave outgoing layers behind.
-        layer.sublayers?.filter { $0 !== textContainer }.forEach { $0.removeFromSuperlayer() }
-        let outgoing = textContainer
-        let container = CALayer()
-        container.frame = CGRect(
-            x: bounds.minX + Self.leadingInset,
-            y: bounds.minY,
-            width: max(0, bounds.width - Self.leadingInset - Self.trailingInset),
-            height: bounds.height
-        )
-        container.masksToBounds = true
-        let viewport = container.bounds.width
-        let width = Self.textWidth(for: currentText)
-        let textFont = Self.textFont
-        let overflow = width > viewport
-        func makeText(x: CGFloat) -> CATextLayer {
-            let text = CATextLayer()
-            text.contentsScale = window?.backingScaleFactor ?? 2
-            text.string = NSAttributedString(string: currentText, attributes: [
-                .font: textFont, .foregroundColor: NSColor.white
-            ])
-            // CATextLayer handles AppKit's flipped backing coordinates itself.
-            // Keep its native drawing and compensate its top inset in placement.
-            let height = ceil(textFont.ascender - textFont.descender + 2)
-            let scale = text.contentsScale
-            let y = (((container.bounds.height - height) / 2 + 1) * scale).rounded() / scale
-            text.frame = CGRect(x: x, y: y, width: reduced ? min(width, viewport) : width, height: height)
-            text.truncationMode = reduced ? .end : .none
-            return text
-        }
-        let primary = makeText(x: overflow ? 0 : floor((viewport - width) / 2))
-        primaryText = primary
-        container.addSublayer(primary)
-        if overflow && !reduced {
-            let travel = max(0, width - viewport)
-            let start = min(offset, travel)
-            let remaining = travel - start
-            let hold: Double = start > 0 ? 0 : 0.15
-            // Only reveal the overflow, then leave the final words stationary.
-            let speed: CGFloat = viewport < 200 ? 62 : 52
-            let duration = remaining > 0 ? max(0.25, Double(remaining / speed)) : 0
-            primary.transform = CATransform3DMakeTranslation(-travel, 0, 0)
-            if remaining > 0 {
-                let scroll = CAKeyframeAnimation(keyPath: "transform.translation.x")
-                scroll.values = [-start, -start, -travel]
-                scroll.keyTimes = [0, NSNumber(value: hold / (hold + duration)), 1]
-                scroll.duration = hold + duration
-                scroll.timingFunctions = [CAMediaTimingFunction(name: .linear), CAMediaTimingFunction(controlPoints: 0.12, 0.2, 0.8, 1)]
-                primary.add(scroll, forKey: "subtitleScroll")
-            }
-            let fade = CAGradientLayer()
-            fade.frame = container.bounds
-            fade.startPoint = CGPoint(x: 0, y: 0.5)
-            fade.endPoint = CGPoint(x: 1, y: 0.5)
-            fade.colors = [NSColor.clear.cgColor, NSColor.black.cgColor, NSColor.black.cgColor, NSColor.clear.cgColor]
-            fade.locations = [0, 0.025, 0.975, 1]
-            container.mask = fade
-        }
+    private func render(transition: Bool, offset: CGFloat = 0) {
+        guard let layer, let content else { return }
         CATransaction.begin()
         CATransaction.setDisableActions(true)
+        scrollTimer?.invalidate()
+        scrollTimer = nil
+        let reduced = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        let container = CALayer()
+        container.frame = bounds.insetBy(dx: Self.horizontalInset, dy: 0)
+        container.masksToBounds = true
+        let viewport = max(0, container.bounds.width)
+        let width = Self.textWidth(for: content.text)
+        let overflow = width > viewport
+        let scrolls = overflow && !reduced && !content.isMetadata
+        scrollPlan = nil
+        scrollBeganAt = nil
+        frozenReadingOffset = 0
+        let text = CATextLayer()
+        text.contentsScale = window?.backingScaleFactor ?? 2
+        text.string = NSAttributedString(string: content.text, attributes: [
+            .font: Self.textFont, .foregroundColor: NSColor.white
+        ])
+        let height = ceil(Self.textFont.ascender - Self.textFont.descender + 2)
+        let y = (((container.bounds.height - height) / 2 + 1) * text.contentsScale).rounded() / text.contentsScale
+        text.frame = CGRect(x: overflow ? 0 : floor((viewport - width) / 2), y: y,
+                            width: scrolls ? width : min(width, viewport), height: height)
+        text.truncationMode = scrolls ? .none : .end
+        container.addSublayer(text)
+
+        if scrolls {
+            let now = CACurrentMediaTime()
+            let budget = content.scrollTimeBudget.map { max(0, $0 - (now - contentReceivedAt)) }
+            let plan = SubtitleScrollPlan(travel: Double(width - viewport), offset: Double(offset), availableTime: budget)
+            scrollPlan = plan
+            scrollBeganAt = window == nil ? nil : now
+            frozenReadingOffset = CGFloat(plan.start)
+            // The model always contains the visible position. Never pre-set it
+            // to the final offset and rely on a presentation animation to hide it.
+            text.transform = CATransform3DMakeTranslation(-CGFloat(plan.start), 0, 0)
+            let mask = CAGradientLayer()
+            mask.frame = container.bounds
+            mask.startPoint = CGPoint(x: 0, y: 0.5)
+            mask.endPoint = CGPoint(x: 1, y: 0.5)
+            let edge = min(0.08, 8 / max(viewport, 1))
+            mask.locations = [0, NSNumber(value: edge), NSNumber(value: 1 - edge), 1]
+            mask.colors = readingEdgeColors(offset: plan.start, end: plan.end)
+            container.mask = mask
+        }
+
+        // Replace the old text immediately, then fade in the new one. Keeping
+        // two differently sized lines on screen creates overlap and false motion.
+        textContainer?.removeFromSuperlayer()
         layer.addSublayer(container)
         textContainer = container
+        primaryText = text
         CATransaction.commit()
-        guard transition, let outgoing else { outgoing?.removeFromSuperlayer(); return }
-        if subtleTransition {
-            outgoing.removeFromSuperlayer()
-            let fadeIn = CABasicAnimation(keyPath: "opacity")
-            fadeIn.fromValue = 0.7
-            fadeIn.toValue = 1
-            fadeIn.duration = 0.10
-            container.add(fadeIn, forKey: "sentenceFadeIn")
-            return
-        }
-        let duration = 0.18
-        CATransaction.begin()
-        CATransaction.setCompletionBlock { outgoing.removeFromSuperlayer() }
-        let fadeIn = CABasicAnimation(keyPath: "opacity")
-        fadeIn.fromValue = 0
-        fadeIn.toValue = 1
-        fadeIn.duration = duration
-        container.add(fadeIn, forKey: "sentenceFadeIn")
-        let fadeOut = CABasicAnimation(keyPath: "opacity")
-        fadeOut.fromValue = 1
-        fadeOut.toValue = 0
-        fadeOut.duration = duration
-        fadeOut.fillMode = .forwards
-        fadeOut.isRemovedOnCompletion = false
-        outgoing.add(fadeOut, forKey: "sentenceFadeOut")
-        if !reduced {
-            for (target, from, to) in [(container, CGFloat(-5), CGFloat(0)), (outgoing, CGFloat(0), CGFloat(5))] {
-                let slide = CABasicAnimation(keyPath: "transform.translation.y")
-                slide.fromValue = from
-                slide.toValue = to
-                slide.duration = duration
-                slide.timingFunction = CAMediaTimingFunction(name: .easeOut)
-                target.add(slide, forKey: "sentenceSlide")
+        if let plan = scrollPlan, plan.duration > 0, window != nil {
+            let timer = Timer(timeInterval: 1 / 60, repeats: true) { [weak self] timer in
+                MainActor.assumeIsolated {
+                    guard let self, let plan = self.scrollPlan, self.window != nil else {
+                        timer.invalidate()
+                        return
+                    }
+                    let offset = self.readingOffset
+                    CATransaction.begin()
+                    CATransaction.setDisableActions(true)
+                    self.primaryText?.transform = CATransform3DMakeTranslation(-offset, 0, 0)
+                    (self.textContainer?.mask as? CAGradientLayer)?.colors = self.readingEdgeColors(offset: Double(offset), end: plan.end)
+                    CATransaction.commit()
+                    if Double(offset) >= plan.end {
+                        timer.invalidate()
+                        self.frozenReadingOffset = CGFloat(plan.end)
+                        self.scrollBeganAt = nil
+                        self.scrollTimer = nil
+                    }
+                }
             }
+            timer.fireDate = Date().addingTimeInterval(plan.hold)
+            scrollTimer = timer
+            RunLoop.main.add(timer, forMode: .common)
         }
-        CATransaction.commit()
+        if transition {
+            let fade = CABasicAnimation(keyPath: "opacity")
+            fade.fromValue = 0.55
+            fade.toValue = 1
+            fade.duration = 0.12
+            container.add(fade, forKey: "sentenceFadeIn")
+        }
     }
+    private func readingEdgeColors(offset: Double, end: Double) -> [CGColor] {
+        let black = NSColor.black.cgColor
+        let leftAlpha = 1 - min(1, max(0, offset) / 8)
+        let rightAlpha = 1 - min(1, max(0, end - offset) / 8)
+        return [CGColor(gray: 0, alpha: leftAlpha), black, black, CGColor(gray: 0, alpha: rightAlpha)]
+    }
+
 }
 #endif

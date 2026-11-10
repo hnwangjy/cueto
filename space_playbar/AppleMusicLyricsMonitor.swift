@@ -105,6 +105,14 @@ final class AppleMusicLyricsMonitor: ObservableObject {
     private var timingOffsets = UserDefaults.standard.dictionary(forKey: "appleMusicLyricTimingOffsets") as? [String: Double] ?? [:]
 
     var hasTimedLyrics: Bool { !cues.isEmpty && snapshot != nil }
+    var currentTrackTitle: String? { snapshot?.title }
+    var currentTrackArtist: String? { snapshot?.artist }
+    var currentLyricRemainingTime: TimeInterval? {
+        guard let snapshot, snapshot.playing, let cue = lyricContext.current,
+              let end = cues.first(where: { $0.time > cue.time })?.time else { return nil }
+        let elapsed = min(max(ProcessInfo.processInfo.systemUptime - snapshot.sampledAt, 0), 1.2)
+        return max(0, end - (snapshot.position + elapsed + 0.30 + timingOffset))
+    }
 
     private func offsetKey(for song: MusicSnapshot) -> String {
         SHA256.hash(data: Data(song.key.utf8)).map { String(format: "%02x", $0) }.joined()
@@ -523,6 +531,9 @@ import Combine
 @MainActor
 final class AppleMusicLyricsMonitor: ObservableObject {
     var hasTimedLyrics: Bool { false }
+    var currentTrackTitle: String? { nil }
+    var currentTrackArtist: String? { nil }
+    var currentLyricRemainingTime: TimeInterval? { nil }
     var lyricContext: LyricContext { LyricContext() }
     var timingOffset: TimeInterval { 0 }
     var isSeeking: Bool { false }

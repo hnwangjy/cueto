@@ -97,6 +97,7 @@ struct CuetoSettingsView: View {
     @ObservedObject var excludedApps: ExcludedAudioApps
     @ObservedObject var subtitles: CosmosSubtitleMonitor
     @ObservedObject var appleLyrics: AppleMusicLyricsMonitor
+    @ObservedObject var cosmosRecovery: CosmosCrashRecoveryMonitor
     @State private var runningApps: [NSRunningApplication] = []
 
     private var appChoices: [(identifier: String, name: String)] {
@@ -412,6 +413,23 @@ struct CuetoSettingsView: View {
                     .labelsHidden().toggleStyle(.switch)
                     .accessibilityLabel(String(localized: "灵动岛面板"))
                     .help(String(localized: "悬停 MacBook 刘海展开，移开后收起"))
+            }
+            .modifier(SettingsCardMaterial())
+            VStack(alignment: .leading, spacing: 0) {
+                settingRow(title: String(localized: "小宇宙异常退出后自动恢复")) {
+                    Toggle("", isOn: $cosmosRecovery.isEnabled)
+                        .labelsHidden().toggleStyle(.switch)
+                        .accessibilityLabel(String(localized: "小宇宙异常退出后自动恢复"))
+                        .help(String(localized: "仅在诊断报告确认已知的后台锁异常后重新打开，不发送播放指令。"))
+                }
+                if cosmosRecovery.isEnabled, let message = cosmosRecovery.statusMessage {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, 14)
+                }
             }
             .modifier(SettingsCardMaterial())
         }
