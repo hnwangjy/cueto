@@ -54,40 +54,55 @@ struct NowPlayingPopover: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if !playback.availableAudioSources.isEmpty {
-                AudioProcessList(playback: playback)
-            }
-
-            HStack(spacing: 10) {
-                if let icon = playback.applicationIcon {
+            HStack(alignment: .center, spacing: 14) {
+                if let artwork = playback.artwork {
+                    Image(nsImage: artwork)
+                        .resizable().scaledToFill()
+                        .frame(width: 80, height: 80)
+                        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .strokeBorder(.primary.opacity(0.08), lineWidth: 0.5)
+                        }
+                        .accessibilityLabel(String(localized: "当前播放封面"))
+                } else if let icon = playback.applicationIcon {
                     Image(nsImage: icon)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(width: 34, height: 34)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .resizable().scaledToFit()
+                        .frame(width: 44, height: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        .accessibilityHidden(true)
                 }
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(playback.applicationName)
-                        .font(.headline)
-                    Text(playback.isPlaying ? String(localized: "正在播放") : String(localized: "已暂停"))
-                        .font(.caption)
-                        .foregroundStyle(playback.isPlaying ? Color.accentColor : .secondary)
-                }
-            }
-
-            if let title = playback.title {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.system(size: 13, weight: .medium))
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack(spacing: 4) {
+                        Text(playback.applicationName)
+                        Text("·")
+                        Text(playback.isPlaying ? String(localized: "正在播放") : String(localized: "已暂停"))
+                        Spacer(minLength: 8)
+                        if playback.artwork != nil, let icon = playback.applicationIcon {
+                            Image(nsImage: icon)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 24, height: 24)
+                                .accessibilityHidden(true)
+                                .help(playback.applicationName)
+                        }
+                    }
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    Text(playback.title ?? playback.applicationName)
+                        .font(.system(size: 14, weight: .semibold))
                         .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                     if let artist = playback.artist {
                         Text(artist)
-                            .font(.caption)
+                            .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             if let elapsedTime = playback.elapsedTime,
@@ -113,6 +128,10 @@ struct NowPlayingPopover: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(12)
                 .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
+            }
+
+            if !playback.availableAudioSources.isEmpty {
+                AudioProcessList(playback: playback)
             }
 
             Divider()

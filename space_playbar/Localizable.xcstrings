@@ -2068,7 +2068,6 @@
       }
     },
     "歌词": {
-      "extractionState": "stale",
       "localizations": {
         "en": {
           "stringUnit": {
@@ -2379,6 +2378,22 @@
           "stringUnit": {
             "state": "translated",
             "value": "设置"
+          }
+        }
+      }
+    },
+    "当前播放封面": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Now playing artwork"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前播放封面"
           }
         }
       }

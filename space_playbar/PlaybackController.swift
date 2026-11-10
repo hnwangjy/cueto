@@ -17,6 +17,8 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var isPlaying = false
     @Published private(set) var hasActiveSession = false
     @Published private(set) var applicationIcon: NSImage?
+    @Published private(set) var artwork: NSImage?
+    private var artworkData: String?
     @Published private(set) var elapsedTime: TimeInterval?
     @Published private(set) var duration: TimeInterval?
     @Published private(set) var activeAudioSources: [ActiveAudioSource] = []
@@ -243,6 +245,7 @@ final class PlaybackController: ObservableObject {
             isPlaying = false
             hasActiveSession = false
             applicationIcon = nil
+            clearArtwork()
             elapsedTime = nil
             duration = nil
             referenceElapsedTime = nil
@@ -274,6 +277,10 @@ final class PlaybackController: ObservableObject {
         }
 
         applicationName = payload.applicationName?.nonEmpty ?? sourceName(for: payload.bundleIdentifier)
+        if bundleIdentifier != payload.bundleIdentifier || artworkData != payload.artworkDataBase64 {
+            artworkData = payload.artworkDataBase64
+            artwork = payload.artwork
+        }
         bundleIdentifier = payload.bundleIdentifier
         title = payload.title?.nonEmpty
         artist = payload.artist?.nonEmpty
@@ -327,6 +334,7 @@ final class PlaybackController: ObservableObject {
         applicationName = source.applicationName
         bundleIdentifier = source.bundleIdentifier
         applicationIcon = source.icon
+        clearArtwork()
         isPlaying = true
         hasActiveSession = true
         title = nil
@@ -399,6 +407,7 @@ final class PlaybackController: ObservableObject {
         isPlaying = false
         hasActiveSession = false
         applicationIcon = nil
+        clearArtwork()
         elapsedTime = nil
         duration = nil
         referenceElapsedTime = nil
@@ -406,6 +415,11 @@ final class PlaybackController: ObservableObject {
         pendingPlaybackState = nil
         refreshActiveAudioSources()
         refreshAvailableAudioSources()
+    }
+
+    private func clearArtwork() {
+        artworkData = nil
+        if artwork != nil { artwork = nil }
     }
 
     private func sourceName(for bundleIdentifier: String?) -> String {
