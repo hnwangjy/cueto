@@ -110,14 +110,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             content = .make(lyric: appleLyrics.currentText,
                 title: title, artist: artist,
                 sourceIdentifier: "com.apple.Music", sourceName: "Apple Music",
-                scrollTimeBudget: appleLyrics.currentLyricRemainingTime)
+                scrollTimeBudget: appleLyrics.currentLyricRemainingTime, scrollSpeed: subtitles.musicScrollSpeed)
             identity = ["com.apple.Music", title, artist]
         } else if showsCosmos {
             let title = source == "app.podcast.cosmos" ? playback.title : nil
             let artist = source == "app.podcast.cosmos" ? playback.artist : nil
             content = .make(lyric: subtitles.currentText,
                 title: title, artist: artist,
-                sourceIdentifier: "app.podcast.cosmos", sourceName: String(localized: "小宇宙"))
+                sourceIdentifier: "app.podcast.cosmos", sourceName: String(localized: "小宇宙"),
+                scrollStyle: .podcast, scrollSpeed: subtitles.cosmosScrollSpeed)
             identity = ["app.podcast.cosmos", title, artist]
         } else {
             content = nil
@@ -142,7 +143,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             subtitleFallbackTask = nil
             scheduledSubtitleRefresh = nil
         }
-        updateSubtitleItem(resolved, width: subtitles.width.points)
+        updateSubtitleItem(resolved, width: (showsApple ? subtitles.musicWidth : subtitles.cosmosWidth).points)
     }
 
     private func updateSubtitleItem(_ content: MenuBarSubtitleContent?, width: CGFloat) {
@@ -204,11 +205,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             let window = NSWindow(contentViewController: NSHostingController(rootView: rootView))
             window.delegate = self
             window.title = "Cueto"
-            window.styleMask = [.titled, .closable, .miniaturizable]
+            window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
             window.isOpaque = false
-            window.backgroundColor = .windowBackgroundColor
-            window.titlebarAppearsTransparent = false
-            window.titleVisibility = .visible
+            window.backgroundColor = .clear
+            window.titlebarAppearsTransparent = true
+            window.titleVisibility = .hidden
+            window.titlebarSeparatorStyle = .none
+            window.isMovableByWindowBackground = true
             window.level = .floating
             window.collectionBehavior.insert(.moveToActiveSpace)
             window.setContentSize(NSSize(width: 780, height: 560))

@@ -27,8 +27,17 @@ enum SubtitleWidth: String, CaseIterable {
 /// Never navigates, clicks, captures audio, or reads another application's UI.
 @MainActor
 final class CosmosSubtitleMonitor: ObservableObject {
-    @Published var width: SubtitleWidth {
-        didSet { UserDefaults.standard.set(width.rawValue, forKey: "subtitleWidth") }
+    @Published var musicWidth: SubtitleWidth {
+        didSet { UserDefaults.standard.set(musicWidth.rawValue, forKey: "musicLyricWidth") }
+    }
+    @Published var cosmosWidth: SubtitleWidth {
+        didSet { UserDefaults.standard.set(cosmosWidth.rawValue, forKey: "cosmosSubtitleWidth") }
+    }
+    @Published var musicScrollSpeed: SubtitleScrollSpeed {
+        didSet { UserDefaults.standard.set(musicScrollSpeed.rawValue, forKey: "musicLyricScrollSpeed") }
+    }
+    @Published var cosmosScrollSpeed: SubtitleScrollSpeed {
+        didSet { UserDefaults.standard.set(cosmosScrollSpeed.rawValue, forKey: "cosmosSubtitleScrollSpeed") }
     }
     @Published var isEnabled: Bool {
         didSet {
@@ -50,7 +59,12 @@ final class CosmosSubtitleMonitor: ObservableObject {
     private let windowCache = CaptionWindowCache()
 
     init() {
-        width = SubtitleWidth(rawValue: UserDefaults.standard.string(forKey: "subtitleWidth") ?? "") ?? .medium
+        let defaults = UserDefaults.standard
+        let previousWidth = defaults.string(forKey: "subtitleWidth")
+        musicWidth = SubtitleWidth(rawValue: defaults.string(forKey: "musicLyricWidth") ?? previousWidth ?? "") ?? .medium
+        cosmosWidth = SubtitleWidth(rawValue: defaults.string(forKey: "cosmosSubtitleWidth") ?? "") ?? .long
+        musicScrollSpeed = SubtitleScrollSpeed(rawValue: defaults.string(forKey: "musicLyricScrollSpeed") ?? "") ?? .normal
+        cosmosScrollSpeed = SubtitleScrollSpeed(rawValue: defaults.string(forKey: "cosmosSubtitleScrollSpeed") ?? "") ?? .slow
         isEnabled = UserDefaults.standard.bool(forKey: "showCosmosSubtitles")
         configureTimer()
         refresh()

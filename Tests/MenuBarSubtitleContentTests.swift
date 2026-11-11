@@ -53,6 +53,21 @@ struct MenuBarSubtitleContentTests {
         assert(SubtitleScrollPlan(travel: 240, offset: 0, availableTime: 1).duration == scroll.duration)
         assert(SubtitleScrollPlan(travel: 240, offset: 300, availableTime: 8).duration == 0)
         assert(SubtitleScrollPlan(travel: 240, offset: 0, availableTime: .nan).duration == scroll.duration)
+        let podcast = SubtitleScrollPlan(travel: 240, offset: 0, availableTime: nil, style: .podcast)
+        assert(podcast.hold == 0.8 && podcast.offset(at: 0.7) == 0 && podcast.duration < scroll.duration)
+        for style in [SubtitleScrollStyle.music, .podcast] {
+            let slow = SubtitleScrollPlan(travel: 240, offset: 0, availableTime: 8, style: style, speed: .slow)
+            let fast = SubtitleScrollPlan(travel: 240, offset: 0, availableTime: 8, style: style, speed: .fast)
+            assert(slow.duration > fast.duration)
+            let resized = SubtitleScrollPlan(travel: 300, offset: 120, availableTime: nil, style: style, speed: .fast)
+            assert(resized.start == 120 && resized.hold == 0)
+        }
+        var fasterLine = line
+        fasterLine.scrollSpeed = .fast
+        assert(fasterLine != line)
+        var podcastLine = line
+        podcastLine.scrollStyle = .podcast
+        assert(podcastLine != line)
         var sampled = line
         sampled.scrollTimeBudget = 10
         var laterSample = line

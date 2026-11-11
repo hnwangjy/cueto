@@ -144,12 +144,6 @@ struct CuetoSettingsView: View {
     var body: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 16) {
-                Text(String(localized: "设置"))
-                    .font(.system(size: 17, weight: .semibold))
-                    .padding(.horizontal, 20)
-                    .padding(.top, 22)
-                    .padding(.bottom, 12)
-
                 VStack(spacing: 3) {
                     ForEach(Section.allCases) { section in
                         Button {
@@ -185,6 +179,7 @@ struct CuetoSettingsView: View {
                     }
                 }
                 .padding(.horizontal, 12)
+                .padding(.top, 36)
                 Spacer(minLength: 0)
                 Text(versionText)
                     .font(.system(size: 10))
@@ -193,9 +188,6 @@ struct CuetoSettingsView: View {
                     .padding(.bottom, 18)
             }
             .frame(width: 190)
-            .background(SettingsWindowMaterial(material: .sidebar))
-
-            Rectangle().fill(.primary.opacity(0.06)).frame(width: 1)
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 30) {
@@ -217,13 +209,25 @@ struct CuetoSettingsView: View {
                     case .experiments: experimentalSettings
                     }
                 }
-                .padding(32)
+                .padding(24)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(nsColor: .textBackgroundColor).opacity(0.88))
+            .background {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color(nsColor: .textBackgroundColor).opacity(0.42))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(.primary.opacity(0.06), lineWidth: 0.5)
+                    }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .padding(.top, 36)
+            .padding(.trailing, 20)
+            .padding(.bottom, 20)
         }
         .background(SettingsWindowMaterial())
+        .ignoresSafeArea()
         .frame(minWidth: 660, minHeight: 500)
         .onAppear {
             model.refresh()
@@ -321,6 +325,7 @@ struct CuetoSettingsView: View {
                     .padding(.leading, 14)
                     .padding(.trailing, 14)
                     .padding(.bottom, 12)
+                    subtitleDisplayControls(width: $subtitles.musicWidth, speed: $subtitles.musicScrollSpeed)
                     VStack(alignment: .leading, spacing: 8) {
                         Text(String(localized: "歌词校时"))
                             .font(.system(size: 12, weight: .medium))
@@ -333,26 +338,7 @@ struct CuetoSettingsView: View {
 #endif
             }
             .modifier(SettingsCardMaterial())
-            VStack(alignment: .leading, spacing: 0) {
-                if subtitles.isEnabled || appleLyrics.isEnabled {
-                    HStack(spacing: 16) {
-                        Text(String(localized: "字幕宽度")).font(.system(size: 12))
-                        Spacer(minLength: 0)
-                        Picker(String(localized: "字幕宽度"), selection: $subtitles.width) {
-                            ForEach(SubtitleWidth.allCases, id: \.self) { width in
-                                Text(width.title).tag(width)
-                            }
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.segmented)
-                        .frame(width: 180)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 12)
-                }
 
-
-            }
         }
     }
 
@@ -373,6 +359,10 @@ struct CuetoSettingsView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 14)
                     .padding(.bottom, 12)
+
+                if subtitles.isEnabled {
+                    subtitleDisplayControls(width: $subtitles.cosmosWidth, speed: $subtitles.cosmosScrollSpeed)
+                }
 
                 if subtitles.isEnabled && subtitles.currentText == nil {
                     HStack(alignment: .top, spacing: 8) {
@@ -488,6 +478,38 @@ struct CuetoSettingsView: View {
         let name = FileManager.default.displayName(atPath: url.path)
             .replacingOccurrences(of: ".app", with: "")
         excludedApps.setExcluded(true, identifier: identifier, name: name)
+    }
+
+    private func subtitleDisplayControls(width: Binding<SubtitleWidth>, speed: Binding<SubtitleScrollSpeed>) -> some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 16) {
+                Text(String(localized: "显示宽度"))
+                Spacer(minLength: 0)
+                Picker(String(localized: "显示宽度"), selection: width) {
+                    ForEach(SubtitleWidth.allCases, id: \.self) { width in
+                        Text(width.title).tag(width)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 180)
+            }
+            HStack(spacing: 16) {
+                Text(String(localized: "滚动速度"))
+                Spacer(minLength: 0)
+                Picker(String(localized: "滚动速度"), selection: speed) {
+                    ForEach(SubtitleScrollSpeed.allCases, id: \.self) { speed in
+                        Text(speed.title).tag(speed)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.segmented)
+                .frame(width: 180)
+            }
+        }
+        .font(.system(size: 12))
+        .padding(.horizontal, 14)
+        .padding(.bottom, 14)
     }
 
     private func settingRow<Accessory: View>(

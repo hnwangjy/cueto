@@ -44,12 +44,16 @@ final class SubtitleStatusView: NSButton {
         let extendsCurrentLine = content.map {
             !$0.isMetadata && !$0.text.isEmpty && !next.isMetadata && $0.sourceIdentifier == next.sourceIdentifier && next.text.hasPrefix($0.text)
         } ?? false
-        let offset = extendsCurrentLine ? readingOffset : 0
+        let sameLine = content.map {
+            $0.text == next.text && $0.sourceIdentifier == next.sourceIdentifier && $0.isMetadata == next.isMetadata
+        } ?? false
+        let preservesPosition = sameLine || extendsCurrentLine
+        let offset = preservesPosition ? readingOffset : 0
         content = next
-        contentReceivedAt = CACurrentMediaTime()
+        if !preservesPosition { contentReceivedAt = CACurrentMediaTime() }
         toolTip = next.text
         setAccessibilityValue(next.text)
-        render(transition: !extendsCurrentLine, offset: offset)
+        render(transition: !preservesPosition, offset: offset)
     }
 
     private var readingOffset: CGFloat {
@@ -108,7 +112,8 @@ final class SubtitleStatusView: NSButton {
         if scrolls {
             let now = CACurrentMediaTime()
             let budget = content.scrollTimeBudget.map { max(0, $0 - (now - contentReceivedAt)) }
-            let plan = SubtitleScrollPlan(travel: Double(width - viewport), offset: Double(offset), availableTime: budget)
+            let plan = SubtitleScrollPlan(travel: Double(width - viewport), offset: Double(offset), availableTime: budget,
+                                          style: content.scrollStyle, speed: content.scrollSpeed)
             scrollPlan = plan
             scrollBeganAt = window == nil ? nil : now
             frozenReadingOffset = CGFloat(plan.start)
