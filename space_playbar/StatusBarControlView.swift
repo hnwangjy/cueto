@@ -108,8 +108,10 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
         }
     }
 
+    // Icons already carry their own colors, while labels and symbols are
+    // explicitly styled. Vibrancy would wash out the app artwork.
     override var allowsVibrancy: Bool {
-        true
+        false
     }
 
     override func viewDidMoveToWindow() {
@@ -398,6 +400,7 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
 }
 
 private final class StatusBarNativeButton: NSButton {
+    override var allowsVibrancy: Bool { false }
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     static let idleSourceIdentifier = "com.wangjiayuan.cueto.idle"
@@ -585,6 +588,13 @@ private final class StatusBarNativeButton: NSButton {
     }
 
     private func drawSource(opacity: CGFloat) {
+        // Align the source identity optically with the transport symbols.
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        let alignment = NSAffineTransform()
+        alignment.translateX(by: 0, yBy: isFlipped ? 1 : -1)
+        alignment.concat()
+
         if isIdleState, let displayedSource, displayedSource.identifier == Self.idleSourceIdentifier {
             drawSourceIdentity(displayedSource, countWidth: 0, xOffset: 0, opacity: opacity)
             return

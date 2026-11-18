@@ -2,6 +2,7 @@
 import AppKit
 import Combine
 import MediaRemoteAdapter
+import OSLog
 
 @MainActor
 final class PlaybackController: ObservableObject {
@@ -72,6 +73,12 @@ final class PlaybackController: ObservableObject {
     private var referenceElapsedTime: TimeInterval?
     private var referenceDate = Date()
     private var playbackRate = 0.0
+    private let transportLogger = Logger(subsystem: "com.wangjiayuan.cueto", category: "PlaybackTransport")
+    private let musicQueue = DispatchQueue(label: "com.wangjiayuan.cueto.music-transport", qos: .userInitiated)
+    private var confirmedMusicPlaying: Bool?
+    private var musicStateSampledAt = 0.0
+    private var musicReadInFlight = false
+    private var nextMusicRead = Date.distantPast
     private var pendingPlaybackState: Bool?
     private var pendingStateDeadline = Date.distantPast
     private var pendingStateToken = UUID()
@@ -146,7 +153,10 @@ final class PlaybackController: ObservableObject {
 
     func playPause() {
         guard hasActiveSession else { return }
-
+        if bundleIdentifier == "com.apple.Music" {
+            toggleMusicPlayback()
+            return
+        }
 
         let targetState = !isPlaying
         pendingPlaybackState = targetState
@@ -168,6 +178,63 @@ final class PlaybackController: ObservableObject {
                 self?.receive(info)
             }
         }
+    }
+
+    private func toggleMusicPlayback() {
+        sourceOpenError = nil
+        // Keep the confirmed icon until Music replies. The global media target
+        // may be an entirely different app, so it cannot acknowledge this command.
+        musicQueue.async { [weak self] in
+            let result = AppleMusicPlayer.togglePlayback()
+            DispatchQueue.main.async {
+                guard let self, self.bundleIdentifier == "com.apple.Music" else { return }
+                self.transportLogger.info("Music toggle error=\(result.error ?? 0)")
+                if let playing = result.playing {
+                    self.applyMusicState(playing)
+                } else {
+                    self.sourceOpenError = result.error == -1743
+                        ? String(localized: "需要允许 Cueto 控制音乐，请在系统设置的自动化中授权。")
+                        : String(localized: "未能控制音乐，请重试。")
+                }
+                self.media.getTrackInfo { [weak self] info in self?.receive(info) }
+            }
+        }
+    }
+
+    private func refreshMusicState() {
+        guard confirmedMusicPlaying != nil, bundleIdentifier == "com.apple.Music",
+              !musicReadInFlight, Date() >= nextMusicRead else { return }
+        musicReadInFlight = true
+        nextMusicRead = Date().addingTimeInterval(1)
+        musicQueue.async { [weak self] in
+            let result = AppleMusicPlayer.readPlaybackState()
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.musicReadInFlight = false
+                guard self.bundleIdentifier == "com.apple.Music" else { return }
+                if let playing = result.playing { self.applyMusicState(playing) }
+                else { self.confirmedMusicPlaying = nil }
+            }
+        }
+    }
+
+    private var hasRecentMusicState: Bool {
+        bundleIdentifier == "com.apple.Music" && confirmedMusicPlaying != nil &&
+            ProcessInfo.processInfo.systemUptime - musicStateSampledAt < 2.5
+    }
+
+    private func applyMusicState(_ playing: Bool) {
+        confirmedMusicPlaying = playing
+        musicStateSampledAt = ProcessInfo.processInfo.systemUptime
+        pendingPlaybackState = nil
+        audioActivityPolicy.report(bundleIdentifier: "com.apple.Music", playing: playing)
+        referenceElapsedTime = currentElapsedTime
+        referenceDate = Date()
+        isPlaying = playing
+        playbackRate = playing ? 1 : 0
+        refreshActiveAudioSources()
+        refreshAvailableAudioSources()
+        elapsedTime = currentElapsedTime
     }
 
     func goBackward() {
@@ -227,11 +294,13 @@ final class PlaybackController: ObservableObject {
     }
 
     private func refreshDisplayedProgress() {
+        refreshMusicState()
         elapsedTime = currentElapsedTime
     }
 
     private func receive(_ info: TrackInfo?) {
         guard let payload = info?.payload else {
+            if hasRecentMusicState { return }
             if adoptRunningAudioSourceIfNeeded() {
                 return
             }
@@ -255,7 +324,9 @@ final class PlaybackController: ObservableObject {
             return
         }
 
-        let reportedPlaying = payload.isPlaying ?? ((payload.playbackRate ?? 0) > 0)
+        let systemReportedPlaying = payload.isPlaying ?? ((payload.playbackRate ?? 0) > 0)
+        let reportedPlaying = payload.bundleIdentifier == "com.apple.Music" && hasRecentMusicState
+            ? (confirmedMusicPlaying ?? systemReportedPlaying) : systemReportedPlaying
         if let identifier = payload.bundleIdentifier {
             audioActivityPolicy.report(bundleIdentifier: identifier, playing: reportedPlaying)
             audioSourceMonitor.rememberMediaSource(
@@ -270,6 +341,10 @@ final class PlaybackController: ObservableObject {
             clearDisplayedSource()
             return
         }
+        if hasRecentMusicState, payload.bundleIdentifier != "com.apple.Music", !reportedPlaying {
+            return
+        }
+        if payload.bundleIdentifier != "com.apple.Music", reportedPlaying { confirmedMusicPlaying = nil }
         if !reportedPlaying,
            let payloadBundleIdentifier = payload.bundleIdentifier,
            adoptRunningAudioSourceIfNeeded(excluding: payloadBundleIdentifier) {
@@ -304,6 +379,10 @@ final class PlaybackController: ObservableObject {
     }
 
     private func reconcileDisplayedSourceWithRunningAudio() {
+        if hasRecentMusicState, confirmedMusicPlaying == true {
+            refreshActiveAudioSources()
+            return
+        }
         if let bundleIdentifier,
            !excludedApps.bundleIdentifiers.contains(bundleIdentifier),
            playbackCandidates.contains(where: { $0.bundleIdentifier == bundleIdentifier }) {
@@ -400,6 +479,7 @@ final class PlaybackController: ObservableObject {
     }
 
     private func clearDisplayedSource() {
+        confirmedMusicPlaying = nil
         applicationName = String(localized: "未在播放")
         bundleIdentifier = nil
         title = nil

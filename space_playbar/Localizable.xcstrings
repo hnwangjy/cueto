@@ -2606,6 +2606,38 @@
           }
         }
       }
+    },
+    "需要允许 Cueto 控制音乐，请在系统设置的自动化中授权。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow Cueto to control Music in System Settings > Privacy & Security > Automation."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要允许 Cueto 控制音乐，请在系统设置的自动化中授权。"
+          }
+        }
+      }
+    },
+    "未能控制音乐，请重试。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unable to control Music. Please try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未能控制音乐，请重试。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
