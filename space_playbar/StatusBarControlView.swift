@@ -299,6 +299,8 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
     }
 
     private func refreshTransportControls() {
+        backwardButton.kind = .symbol(playback.backwardControlSymbol)
+        forwardButton.kind = .symbol(playback.forwardControlSymbol)
         update(button: backwardButton, label: playback.backwardControlLabel)
         update(button: forwardButton, label: playback.forwardControlLabel)
     }
@@ -720,7 +722,7 @@ private final class StatusBarNativeButton: NSButton {
             hierarchicalColor: (color ?? foregroundColor).withAlphaComponent(opacity)
         )
         guard let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
-            .withSymbolConfiguration(baseConfiguration.applying(colorConfiguration)) else { return }
+            .withSymbolConfiguration(baseConfiguration.applying(colorConfiguration).applying(.preferringMonochrome())) else { return }
         let size = image.size
         let imageRect = NSRect(
             x: rect.midX - size.width / 2,

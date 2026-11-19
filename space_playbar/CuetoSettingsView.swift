@@ -118,14 +118,15 @@ struct CuetoSettingsView: View {
     }
 
     private enum Section: String, CaseIterable, Identifiable {
-        case general, lyrics, hiddenApps, experiments
+        case general, lyrics, hiddenApps, notch, experiments
         var id: Self { self }
         var title: String {
             switch self {
             case .general: String(localized: "通用")
-            case .lyrics: String(localized: "歌词")
+            case .lyrics: String(localized: "Apple Music 歌词")
             case .hiddenApps: String(localized: "隐藏应用")
-            case .experiments: String(localized: "实验功能")
+            case .notch: String(localized: "灵动岛")
+            case .experiments: String(localized: "小宇宙实验功能")
             }
         }
         var icon: String {
@@ -133,6 +134,7 @@ struct CuetoSettingsView: View {
             case .general: "gearshape"
             case .lyrics: "captions.bubble"
             case .hiddenApps: "eye.slash"
+            case .notch: "macbook"
             case .experiments: "flask"
             }
         }
@@ -206,6 +208,7 @@ struct CuetoSettingsView: View {
                     case .general: generalSettings
                     case .lyrics: lyricsSettings
                     case .hiddenApps: hiddenAppSettings
+                    case .notch: notchSettings
                     case .experiments: experimentalSettings
                     }
                 }
@@ -398,13 +401,6 @@ struct CuetoSettingsView: View {
 
             }
             .modifier(SettingsCardMaterial())
-            settingRow(title: String(localized: "灵动岛面板")) {
-                Toggle("", isOn: $openPanelAtNotch)
-                    .labelsHidden().toggleStyle(.switch)
-                    .accessibilityLabel(String(localized: "灵动岛面板"))
-                    .help(String(localized: "悬停 MacBook 刘海展开，移开后收起"))
-            }
-            .modifier(SettingsCardMaterial())
             VStack(alignment: .leading, spacing: 0) {
                 settingRow(title: String(localized: "小宇宙异常退出后自动恢复")) {
                     Toggle("", isOn: $cosmosRecovery.isEnabled)
@@ -425,10 +421,24 @@ struct CuetoSettingsView: View {
         }
     }
 
+    private var notchSettings: some View {
+        settingRow(title: String(localized: "灵动岛面板")) {
+            Toggle("", isOn: $openPanelAtNotch)
+                .labelsHidden().toggleStyle(.switch)
+                .accessibilityLabel(String(localized: "灵动岛面板"))
+                .help(String(localized: "悬停 MacBook 刘海展开，移开后收起"))
+        }
+        .modifier(SettingsCardMaterial())
+    }
+
     private var hiddenAppSettings: some View {
             VStack(alignment: .leading, spacing: 9) {
-                HStack {
-                    Spacer()
+                HStack(alignment: .top, spacing: 12) {
+                    Text(String(localized: "勾选后，应用不会出现在控制栏、来源数量和音频应用列表中。"))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     Button(String(localized: "添加应用…"), action: chooseApplication)
                         .controlSize(.small)
                 }

@@ -244,11 +244,19 @@ private struct NotchPlaybackView: View {
             }.padding(.horizontal, 16).padding(.top, 14)
             if playback.hasActiveSession {
                 HStack(spacing: 26) {
-                    Button(action: playback.goBackward) { Image(systemName: "backward.end.fill") }
+                    Button(action: playback.goBackward) {
+                        Image(systemName: playback.backwardControlSymbol)
+                            .symbolVariant(.fill)
+                            .symbolRenderingMode(.monochrome)
+                    }
                         .help(playback.backwardControlLabel)
                     Button(action: playback.playPause) { Image(systemName: playback.isPlaying ? "pause.fill" : "play.fill") }
                         .help(playback.isPlaying ? String(localized: "暂停") : String(localized: "播放"))
-                    Button(action: playback.goForward) { Image(systemName: "forward.end.fill") }
+                    Button(action: playback.goForward) {
+                        Image(systemName: playback.forwardControlSymbol)
+                            .symbolVariant(.fill)
+                            .symbolRenderingMode(.monochrome)
+                    }
                         .help(playback.forwardControlLabel)
                 }
                 .font(.system(size: 19)).buttonStyle(.borderless).padding(.top, 16)

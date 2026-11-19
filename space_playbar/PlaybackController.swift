@@ -92,6 +92,14 @@ final class PlaybackController: ObservableObject {
             : .trackNavigation
     }
 
+    var backwardControlSymbol: String {
+        bundleIdentifier == "app.podcast.cosmos" ? "15.arrow.trianglehead.counterclockwise" : "backward.end"
+    }
+
+    var forwardControlSymbol: String {
+        bundleIdentifier == "app.podcast.cosmos" ? "30.arrow.trianglehead.clockwise" : "forward.end"
+    }
+
     var backwardControlLabel: String {
         transportMode == .timeSkipping ? String(localized: "后退 15 秒") : String(localized: "上一首")
     }

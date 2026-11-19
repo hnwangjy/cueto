@@ -2638,6 +2638,54 @@
           }
         }
       }
+    },
+    "灵动岛": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notch"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "灵动岛"
+          }
+        }
+      }
+    },
+    "小宇宙实验功能": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Xiaoyuzhou Labs"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "小宇宙实验功能"
+          }
+        }
+      }
+    },
+    "勾选后，应用不会出现在控制栏、来源数量和音频应用列表中。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected apps are hidden from the control bar, source count, and audio app list."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "勾选后，应用不会出现在控制栏、来源数量和音频应用列表中。"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
