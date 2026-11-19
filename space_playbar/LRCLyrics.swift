@@ -1,6 +1,6 @@
 import Foundation
 
-nonisolated struct LyricCue: Codable, Equatable, Sendable {
+nonisolated struct LyricCue: Codable, Hashable, Sendable {
     let time: TimeInterval
     let text: String
 }
@@ -9,6 +9,25 @@ nonisolated struct LyricContext: Equatable, Sendable {
     var previous: LyricCue?
     var current: LyricCue?
     var next: LyricCue?
+}
+
+/// Show an interlude only when there is enough remaining time to read it.
+nonisolated struct LyricInterludeState {
+    static let minimumDuration: TimeInterval = 2
+    private var gap: [TimeInterval?] = []
+    private(set) var isVisible = false
+
+    mutating func update(context: LyricContext, position: TimeInterval, duration: TimeInterval) {
+        guard position.isFinite, duration.isFinite, duration > 0, context.current == nil else {
+            self = Self()
+            return
+        }
+        let nextGap = [context.previous?.time, context.next?.time]
+        let remaining = (context.next?.time ?? duration) - position
+        let continuing = gap == nextGap && isVisible
+        isVisible = continuing || remaining >= Self.minimumDuration
+        gap = nextGap
+    }
 }
 
 struct LyricMatchCandidate: Decodable, Sendable {

@@ -17,7 +17,7 @@ nonisolated struct MenuBarSubtitleContent: Equatable {
 
     static func make(lyric: String?, title: String?, artist: String?, sourceIdentifier: String, sourceName: String,
                      scrollTimeBudget: TimeInterval? = nil, scrollStyle: SubtitleScrollStyle = .music,
-                     scrollSpeed: SubtitleScrollSpeed = .normal) -> Self {
+                     scrollSpeed: SubtitleScrollSpeed = .normal, isInterlude: Bool = false) -> Self {
         func clean(_ value: String?) -> String? {
             guard let text = value?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
             return text
@@ -25,6 +25,10 @@ nonisolated struct MenuBarSubtitleContent: Equatable {
         if let lyric = clean(lyric) {
             return Self(text: lyric, sourceIdentifier: sourceIdentifier, isMetadata: false,
                         scrollTimeBudget: scrollTimeBudget, scrollStyle: scrollStyle, scrollSpeed: scrollSpeed)
+        }
+        if isInterlude {
+            return Self(text: String(localized: "间奏"), sourceIdentifier: sourceIdentifier, isMetadata: false,
+                        scrollStyle: scrollStyle, scrollSpeed: scrollSpeed)
         }
         var metadata: [String] = []
         for value in [clean(title), clean(artist)].compactMap({ $0 }) where !metadata.contains(value) {

@@ -110,7 +110,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             content = .make(lyric: appleLyrics.currentText,
                 title: title, artist: artist,
                 sourceIdentifier: "com.apple.Music", sourceName: "Apple Music",
-                scrollTimeBudget: appleLyrics.currentLyricRemainingTime, scrollSpeed: subtitles.musicScrollSpeed)
+                scrollTimeBudget: appleLyrics.currentLyricRemainingTime, scrollSpeed: subtitles.musicScrollSpeed,
+                isInterlude: appleLyrics.isInterlude)
             identity = ["com.apple.Music", title, artist]
         } else if showsCosmos {
             let title = source == "app.podcast.cosmos" ? playback.title : nil

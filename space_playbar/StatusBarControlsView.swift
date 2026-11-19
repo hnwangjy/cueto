@@ -195,6 +195,31 @@ struct NowPlayingPopover: View {
 
 struct AppleMusicLyricsPanel: View {
     @ObservedObject var lyrics: AppleMusicLyricsMonitor
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    @State private var rows: [AnimatedLyricRow] = []
+    @State private var displayedContext = LyricContext()
+    @State private var transitionToken = UUID()
+
+    private struct AnimatedLyricRow: Identifiable {
+        enum ID: Hashable {
+            case cue(LyricCue)
+            case placeholder(Int)
+        }
+        let id: ID
+        let cue: LyricCue?
+        var position: CGFloat
+        var current: Bool
+        var clipPosition: CGFloat?
+
+        init(cue: LyricCue?, position: Int) {
+            self.id = cue.map(ID.cue) ?? .placeholder(position)
+            self.cue = cue
+            self.position = CGFloat(position)
+            self.current = position == 1
+            self.clipPosition = cue == nil ? CGFloat(position) : nil
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -203,11 +228,22 @@ struct AppleMusicLyricsPanel: View {
                 .foregroundStyle(.secondary)
 
             if lyrics.hasTimedLyrics {
-                VStack(spacing: 2) {
-                    lyricRow(lyrics.lyricContext.previous, current: false)
-                    lyricRow(lyrics.lyricContext.current, current: true)
-                    lyricRow(lyrics.lyricContext.next, current: false)
+                ZStack(alignment: .top) {
+                    ForEach(rows) { row in
+                        lyricRow(row.cue, current: row.current)
+                            .mask {
+                                Rectangle()
+                                    .offset(y: ((row.clipPosition ?? row.position) - row.position) * 42)
+                            }
+                            .offset(y: row.position * 42)
+                    }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .frame(height: 124)
+                .clipped()
+                .onAppear { updateRows(lyrics.lyricContext, animated: false) }
+                .onChange(of: lyrics.lyricContext) { _, context in updateRows(context, animated: true) }
+                .onDisappear { transitionToken = UUID() }
 
                 if let error = lyrics.seekError {
                     Text(error).font(.caption).foregroundStyle(.secondary)
@@ -224,12 +260,77 @@ struct AppleMusicLyricsPanel: View {
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 10))
     }
 
+    private func updateRows(_ context: LyricContext, animated: Bool) {
+        let incoming = [
+            AnimatedLyricRow(cue: context.previous, position: 0),
+            AnimatedLyricRow(cue: context.current, position: 1),
+            AnimatedLyricRow(cue: context.next, position: 2)
+        ]
+        let token = UUID()
+        transitionToken = token
+        guard animated, !reduceMotion, !rows.isEmpty else {
+            rows = incoming
+            displayedContext = context
+            return
+        }
+        let oldTime = displayedContext.current?.time ?? displayedContext.previous?.time ?? 0
+        let newTime = context.current?.time ?? context.previous?.time ?? 0
+        let direction: CGFloat = newTime < oldTime ? -1 : 1
+        let sharesCue = incoming.contains { candidate in
+            candidate.cue != nil && rows.contains { $0.id == candidate.id }
+        }
+        let distance: CGFloat = sharesCue ? 1 : 3
+        var prepared = rows
+        for row in incoming where !prepared.contains(where: { $0.id == row.id }) {
+            var entering = row
+            if sharesCue {
+                entering.clipPosition = row.position
+                switch row.position {
+                case 0: entering.position = -1
+                case 2: entering.position = 3
+                default: entering.position = 1 + direction
+                }
+            } else {
+                entering.position += direction * distance
+            }
+            prepared.append(entering)
+        }
+        let startingRows = prepared
+        rows = startingRows
+        displayedContext = context
+        // Mount entering rows beyond the viewport before moving the group.
+        DispatchQueue.main.async {
+            guard transitionToken == token else { return }
+            withAnimation(.spring(response: 0.46, dampingFraction: 0.9, blendDuration: 0.12)) {
+                rows = startingRows.map { row in
+                    if var target = incoming.first(where: { $0.id == row.id }) {
+                        target.clipPosition = row.clipPosition
+                        return target
+                    }
+                    var exiting = row
+                    if sharesCue {
+                        exiting.clipPosition = row.position
+                        if row.position < 1 { exiting.position = -1 }
+                        else if row.position > 1 { exiting.position = 3 }
+                        else { exiting.position = 1 - direction }
+                    } else {
+                        exiting.position -= direction * distance
+                    }
+                    return exiting
+                }
+            } completion: {
+                guard transitionToken == token else { return }
+                rows = incoming
+            }
+        }
+    }
+
     private func lyricRow(_ cue: LyricCue?, current: Bool) -> some View {
         Button {
             if let cue { lyrics.seek(to: cue) }
         } label: {
             HStack(spacing: 8) {
-                Text(cue?.text ?? (current ? String(localized: "间奏") : ""))
+                Text(cue?.text ?? (current && lyrics.isInterlude ? String(localized: "间奏") : ""))
                     .font(.system(size: 13, weight: current ? .semibold : .regular))
                     .foregroundStyle(current && cue != nil ? .primary : .secondary)
                     .lineLimit(2)

@@ -6,19 +6,6 @@ import CryptoKit
 import Network
 import OSLog
 
-private struct MusicSnapshot: Sendable {
-    let title: String
-    let artist: String
-    let album: String
-    let duration: Double
-    let position: Double
-    let playing: Bool
-    let identifier: String
-    let sampledAt: TimeInterval
-
-    nonisolated var key: String { "\(identifier)|\(title)|\(artist)|\(album)|\(Int(duration.rounded()))" }
-}
-
 private struct LRCLIBResponse: Codable, Sendable {
     let syncedLyrics: String?
     let instrumental: Bool?
@@ -99,6 +86,8 @@ final class AppleMusicLyricsMonitor: ObservableObject {
     }
     @Published private(set) var currentText: String?
     @Published private(set) var lyricContext = LyricContext()
+    @Published private(set) var isInterlude = false
+    private var interludeState = LyricInterludeState()
     @Published private(set) var timingOffset: TimeInterval = 0
     @Published private(set) var isSeeking = false
     @Published private(set) var seekError: String?
@@ -156,7 +145,7 @@ final class AppleMusicLyricsMonitor: ObservableObject {
             """
             var error: NSDictionary?
             let succeeded = NSAppleScript(source: script)?.executeAndReturnError(&error).booleanValue == true && error == nil
-            let (state, _, _) = Self.readMusic(includeUpcoming: false)
+            let (state, _, _) = AppleMusicPlayer.readTracks(includeUpcoming: false)
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.isSeeking = false
@@ -192,10 +181,18 @@ final class AppleMusicLyricsMonitor: ObservableObject {
             } ?? 0
             seekError = nil
             lyricContext = LyricContext()
+            isInterlude = false
+            interludeState = LyricInterludeState()
         }
     }
     private var cues: [LyricCue] = [] {
-        didSet { if cues.isEmpty { lyricContext = LyricContext() } }
+        didSet {
+            if cues.isEmpty {
+                lyricContext = LyricContext()
+                isInterlude = false
+                interludeState = LyricInterludeState()
+            }
+        }
     }
     private var request: Task<Void, Never>?
     @Published private var loading = false
@@ -280,7 +277,7 @@ final class AppleMusicLyricsMonitor: ObservableObject {
         let readQueue = !usesDirectLyrics && Date() >= nextQueueRead
         if readQueue { nextQueueRead = Date().addingTimeInterval(15) }
         reader.async { [weak self] in
-            let (state, upcoming, error) = Self.readMusic(includeUpcoming: readQueue)
+            let (state, upcoming, error) = AppleMusicPlayer.readTracks(includeUpcoming: readQueue)
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.reading = false
@@ -334,9 +331,14 @@ final class AppleMusicLyricsMonitor: ObservableObject {
         let position = snapshot.position + (snapshot.playing ? min(max(elapsed, 0), 1.2) : 0)
         // Lead the visual transition slightly while playback is advancing.
         let displayPosition = min(position + (snapshot.playing ? 0.30 : 0) + timingOffset, snapshot.duration)
-        let context = LRCLyrics.context(at: displayPosition, in: cues, bridgingGapsUpTo: usesDirectLyrics ? 0.25 : 0)
+        // Keep the last line across brief vocal pauses. Only longer gaps
+        // should become an interlude in both the panel and the menu bar.
+        let context = LRCLyrics.context(at: displayPosition, in: cues, bridgingGapsUpTo: LyricInterludeState.minimumDuration)
+        interludeState.update(context: context, position: displayPosition, duration: snapshot.duration)
+        let interlude = !cues.isEmpty && interludeState.isVisible
         let text = context.current?.text
         if lyricContext != context { lyricContext = context }
+        if isInterlude != interlude { isInterlude = interlude }
         if currentText != text { currentText = text }
     }
 
@@ -477,51 +479,6 @@ final class AppleMusicLyricsMonitor: ObservableObject {
         return result
     }
 
-    nonisolated private static func readMusic(includeUpcoming: Bool) -> (MusicSnapshot?, MusicSnapshot?, Int?) {
-        let script = """
-        with timeout of 2 seconds
-        tell application id "com.apple.Music"
-            if not running then return {}
-            if player state is stopped then return {}
-            set t to current track
-            set upcoming to {}
-            if \(includeUpcoming ? "true" : "false") then
-                try
-                    if shuffle enabled is false and fixed indexing is false then
-                        set p to current playlist
-                        set i to index of t
-                        if persistent ID of track i of p is persistent ID of t then
-                            if i < count tracks of p then
-                                set n to track (i + 1) of p
-                                set upcoming to {name of n, artist of n, album of n, duration of n, 0, "paused", persistent ID of n}
-                            end if
-                        end if
-                    end if
-                end try
-            end if
-            return {{name of t, artist of t, album of t, duration of t, player position, player state as text, persistent ID of t}, upcoming}
-        end tell
-        end timeout
-        """
-        var error: NSDictionary?
-        guard let program = NSAppleScript(source: script) else { return (nil, nil, -1) }
-        let result = program.executeAndReturnError(&error)
-        if let error { return (nil, nil, (error[NSAppleScript.errorNumber] as? Int) ?? -1) }
-        return (result.atIndex(1).flatMap(Self.decodeTrack), result.atIndex(2).flatMap(Self.decodeTrack), nil)
-    }
-
-    nonisolated private static func decodeTrack(_ result: NSAppleEventDescriptor) -> MusicSnapshot? {
-        guard result.numberOfItems == 7,
-              let title = result.atIndex(1)?.stringValue, !title.isEmpty,
-              let artist = result.atIndex(2)?.stringValue, !artist.isEmpty,
-              let album = result.atIndex(3)?.stringValue,
-              let duration = result.atIndex(4)?.doubleValue, duration.isFinite, duration > 0,
-              let position = result.atIndex(5)?.doubleValue, position.isFinite else { return nil }
-        return (MusicSnapshot(title: title, artist: artist, album: album, duration: duration,
-                              position: max(0, position), playing: result.atIndex(6)?.stringValue == "playing",
-                              identifier: result.atIndex(7)?.stringValue ?? title,
-                              sampledAt: ProcessInfo.processInfo.systemUptime))
-    }
 }
 #else
 import Combine
@@ -531,6 +488,7 @@ import Combine
 @MainActor
 final class AppleMusicLyricsMonitor: ObservableObject {
     var hasTimedLyrics: Bool { false }
+    var isInterlude: Bool { false }
     var currentTrackTitle: String? { nil }
     var currentTrackArtist: String? { nil }
     var currentLyricRemainingTime: TimeInterval? { nil }

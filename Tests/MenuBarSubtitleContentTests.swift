@@ -68,6 +68,16 @@ struct MenuBarSubtitleContentTests {
         var podcastLine = line
         podcastLine.scrollStyle = .podcast
         assert(podcastLine != line)
+        let interlude = MenuBarSubtitleContent.make(lyric: nil, title: "Song", artist: "Artist",
+            sourceIdentifier: "music", sourceName: "Music", isInterlude: true)
+        assert(interlude.text == String(localized: "间奏") && !interlude.isMetadata)
+        assert(MenuBarSubtitleContent.make(lyric: "Real lyric", title: "Song", artist: "Artist",
+            sourceIdentifier: "music", sourceName: "Music", isInterlude: true) == line)
+        var interludeContinuity = MenuBarSubtitleContinuity()
+        _ = interludeContinuity.resolve(line, trackIdentity: track, at: now)
+        assert(interludeContinuity.resolve(interlude, trackIdentity: track, at: now.addingTimeInterval(1)) == interlude)
+        assert(interludeContinuity.refreshAt == nil)
+        assert(interludeContinuity.resolve(next, trackIdentity: track, at: now.addingTimeInterval(2)) == next)
         var sampled = line
         sampled.scrollTimeBudget = 10
         var laterSample = line

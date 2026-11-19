@@ -3,6 +3,25 @@
     <channel>
         <title>Cueto</title>
         <item>
+            <title>1.3.7</title>
+            <pubDate>Thu, 19 Nov 2026 21:55:46 +0800</pubDate>
+            <link>https://github.com/hnwangjy/cueto</link>
+            <sparkle:version>23</sparkle:version>
+            <sparkle:shortVersionString>1.3.7</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.7</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Cueto 1.3.7
+
+播放面板中的歌词以连续纵向移动衔接，落位更加柔和。短句间停顿保留上一句，较长空档在面板与菜单栏同步显示“间奏”。音乐资料支持直接读取，封面、歌曲名称与进度呈现更完整。
+
+设置导航进一步梳理，灵动岛拥有独立页面。小宇宙配备清晰的 15／30 秒跳转图标，让播放控制更加直观。
+
+Lyrics now flow vertically through the playback panel with a softer settling motion. Short vocal pauses retain the current line, while longer gaps display an instrumental indicator in both the panel and menu bar. Direct reading of Music track details improves artwork, title, and progress display.
+
+Settings navigation is clearer, with a dedicated Notch page and distinct Xiaoyuzhou settings. New 15- and 30-second skip icons make podcast controls easier to identify.
+]]></description>
+            <enclosure url="https://github.com/hnwangjy/cueto/releases/download/v1.3.7/Cueto-1.3.7.dmg" type="application/octet-stream" sparkle:edSignature="pugR3Yrm5aQovQF1Mc5Etqg3YlmyPqXwnlPy7ffcqBWVl1Hzs1Ih6PZwfCx6cvbK8KliOUdWz7hjwfgvPAwOCQ==" length="5125609"/>
+        </item>
+        <item>
             <title>1.3.6</title>
             <pubDate>Wed, 18 Nov 2026 11:30:22 +0800</pubDate>
             <link>https://github.com/hnwangjy/cueto</link>

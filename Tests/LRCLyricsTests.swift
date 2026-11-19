@@ -44,6 +44,38 @@ struct LRCLyricsTests {
             let roundedDownPosition = floor(target * 1000) / 1000
             assert(LRCLyrics.context(at: roundedDownPosition + offset, in: timeline).current == timeline[2])
         }
+        let pauses = [LyricCue(time: 0, text: "First"), LyricCue(time: 5, text: ""),
+                      LyricCue(time: 6.4, text: "Second"), LyricCue(time: 9, text: ""),
+                      LyricCue(time: 11, text: "Third"), LyricCue(time: 14, text: ""),
+                      LyricCue(time: 18, text: "Fourth")]
+        assert(LRCLyrics.context(at: 5.8, in: pauses, bridgingGapsUpTo: 2).current == pauses[0])
+        assert(LRCLyrics.context(at: 6.4, in: pauses, bridgingGapsUpTo: 2).current == pauses[2])
+        assert(LRCLyrics.context(at: 10.9, in: pauses, bridgingGapsUpTo: 2).current == pauses[2])
+        assert(LRCLyrics.context(at: 11, in: pauses, bridgingGapsUpTo: 2).current == pauses[4])
+        assert(LRCLyrics.context(at: 15, in: pauses, bridgingGapsUpTo: 2).current == nil)
+        assert(LRCLyrics.context(at: 18, in: pauses, bridgingGapsUpTo: 2).current == pauses[6])
+        for position in [5.8, 6.4, 10.9, 11, 15, 18] {
+            assert(LRCLyrics.context(at: position, in: pauses, bridgingGapsUpTo: 2).current?.text ==
+                   LRCLyrics.line(at: position, in: pauses, bridgingGapsUpTo: 2))
+        }
+        var interlude = LyricInterludeState()
+        let longGap = LRCLyrics.context(at: 15, in: pauses, bridgingGapsUpTo: 2)
+        interlude.update(context: longGap, position: 15, duration: 30)
+        assert(interlude.isVisible)
+        interlude.update(context: longGap, position: 17.9, duration: 30)
+        assert(interlude.isVisible)
+        interlude.update(context: LRCLyrics.context(at: 18, in: pauses), position: 18, duration: 30)
+        assert(!interlude.isVisible)
+        interlude.update(context: longGap, position: 17.5, duration: 30)
+        assert(!interlude.isVisible)
+        interlude.update(context: LyricContext(next: LyricCue(time: 1, text: "Opening")), position: 0, duration: 30)
+        assert(!interlude.isVisible)
+        interlude.update(context: LyricContext(next: LyricCue(time: 5, text: "Opening")), position: 0, duration: 30)
+        assert(interlude.isVisible)
+        interlude.update(context: LyricContext(next: LyricCue(time: 5, text: "Opening")), position: 4.9, duration: 30)
+        assert(interlude.isVisible)
+        interlude.update(context: longGap, position: .nan, duration: 30)
+        assert(!interlude.isVisible)
         let brief = [LyricCue(time: 1, text: "Short"), LyricCue(time: 1.01, text: "Next")]
         let briefTarget = LRCLyrics.seekPosition(for: brief[0], in: brief, timingOffset: 0, duration: 40)
         assert(briefTarget > 1 && briefTarget < 1.01)

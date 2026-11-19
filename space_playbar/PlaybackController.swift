@@ -75,6 +75,13 @@ final class PlaybackController: ObservableObject {
     private var playbackRate = 0.0
     private let transportLogger = Logger(subsystem: "com.wangjiayuan.cueto", category: "PlaybackTransport")
     private let musicQueue = DispatchQueue(label: "com.wangjiayuan.cueto.music-transport", qos: .userInitiated)
+    private let musicMetadataQueue = DispatchQueue(label: "com.wangjiayuan.cueto.music-metadata", qos: .utility)
+    private var needsMusicMetadata = false
+    private var musicMetadataInFlight = false
+    private var musicMetadataGeneration = UUID()
+    private var nextMusicMetadataRead = Date.distantPast
+    private var musicArtworkKey: String?
+    private var nextMusicArtworkRead = Date.distantPast
     private var confirmedMusicPlaying: Bool?
     private var musicStateSampledAt = 0.0
     private var musicReadInFlight = false
@@ -226,6 +233,44 @@ final class PlaybackController: ObservableObject {
         }
     }
 
+    private func refreshMusicMetadata() {
+        guard needsMusicMetadata, bundleIdentifier == "com.apple.Music", !musicMetadataInFlight,
+              Date() >= nextMusicMetadataRead else { return }
+        musicMetadataInFlight = true
+        nextMusicMetadataRead = Date().addingTimeInterval(2)
+        let generation = musicMetadataGeneration
+        let artworkKey = musicArtworkKey
+        let canRetryArtwork = artwork == nil && Date() >= nextMusicArtworkRead
+        musicMetadataQueue.async { [weak self] in
+            let (snapshot, _, _) = AppleMusicPlayer.readTracks(includeUpcoming: false)
+            let readsArtwork = snapshot.map { $0.key != artworkKey || canRetryArtwork } ?? false
+            let data = readsArtwork ? snapshot.flatMap { AppleMusicPlayer.readArtwork(for: $0.identifier) } : nil
+            // Confirm the track after a potentially slower artwork request.
+            let refreshed = readsArtwork ? AppleMusicPlayer.readTracks(includeUpcoming: false).0 : snapshot
+            let state = refreshed?.key == snapshot?.key ? refreshed : nil
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.musicMetadataInFlight = false
+                guard self.bundleIdentifier == "com.apple.Music", self.needsMusicMetadata,
+                      self.musicMetadataGeneration == generation, let state else { return }
+                if self.musicArtworkKey != state.key { self.clearArtwork() }
+                self.title = state.title
+                self.artist = state.artist.nonEmpty
+                self.duration = state.duration
+                if state.sampledAt >= self.musicStateSampledAt {
+                    self.referenceElapsedTime = state.position + (state.playing ? max(0, ProcessInfo.processInfo.systemUptime - state.sampledAt) : 0)
+                    self.referenceDate = Date()
+                    self.applyMusicState(state.playing)
+                }
+                if readsArtwork {
+                    self.artwork = data.flatMap(NSImage.init(data:))
+                    self.musicArtworkKey = state.key
+                    self.nextMusicArtworkRead = Date().addingTimeInterval(10)
+                }
+            }
+        }
+    }
+
     private var hasRecentMusicState: Bool {
         bundleIdentifier == "com.apple.Music" && confirmedMusicPlaying != nil &&
             ProcessInfo.processInfo.systemUptime - musicStateSampledAt < 2.5
@@ -302,6 +347,7 @@ final class PlaybackController: ObservableObject {
     }
 
     private func refreshDisplayedProgress() {
+        refreshMusicMetadata()
         refreshMusicState()
         elapsedTime = currentElapsedTime
     }
@@ -359,6 +405,22 @@ final class PlaybackController: ObservableObject {
             return
         }
 
+        if bundleIdentifier != payload.bundleIdentifier {
+            musicMetadataGeneration = UUID()
+            musicArtworkKey = nil
+            nextMusicMetadataRead = .distantPast
+            nextMusicArtworkRead = .distantPast
+        }
+        let incompleteMusicInfo = payload.bundleIdentifier == "com.apple.Music" &&
+            (payload.title?.nonEmpty == nil || payload.artworkDataBase64 == nil)
+        if incompleteMusicInfo, bundleIdentifier == "com.apple.Music", musicArtworkKey != nil {
+            needsMusicMetadata = true
+            if title == payload.title?.nonEmpty || payload.title?.nonEmpty == nil { return }
+        }
+        if !incompleteMusicInfo {
+            needsMusicMetadata = false
+            musicMetadataGeneration = UUID()
+        }
         applicationName = payload.applicationName?.nonEmpty ?? sourceName(for: payload.bundleIdentifier)
         if bundleIdentifier != payload.bundleIdentifier || artworkData != payload.artworkDataBase64 {
             artworkData = payload.artworkDataBase64
@@ -376,6 +438,7 @@ final class PlaybackController: ObservableObject {
             isPlaying = reportedPlaying
         }
         hasActiveSession = true
+        needsMusicMetadata = incompleteMusicInfo
         applicationIcon = icon(for: payload.bundleIdentifier)
         duration = payload.durationMicros.map { $0 / 1_000_000 }
         referenceElapsedTime = payload.currentElapsedTime ?? payload.elapsedTimeMicros.map { $0 / 1_000_000 }
@@ -418,19 +481,28 @@ final class PlaybackController: ObservableObject {
             return false
         }
 
+        let sourceChanged = bundleIdentifier != source.bundleIdentifier
         applicationName = source.applicationName
         bundleIdentifier = source.bundleIdentifier
         applicationIcon = source.icon
-        clearArtwork()
         isPlaying = true
         hasActiveSession = true
-        title = nil
-        artist = nil
-        elapsedTime = nil
-        duration = nil
-        referenceElapsedTime = nil
-        playbackRate = 1
-        pendingPlaybackState = nil
+        needsMusicMetadata = source.bundleIdentifier == "com.apple.Music"
+        if sourceChanged || source.bundleIdentifier != "com.apple.Music" {
+            musicMetadataGeneration = UUID()
+            musicArtworkKey = nil
+            nextMusicMetadataRead = .distantPast
+            nextMusicArtworkRead = .distantPast
+            clearArtwork()
+            title = nil
+            artist = nil
+            elapsedTime = nil
+            duration = nil
+            referenceElapsedTime = nil
+            playbackRate = 1
+            pendingPlaybackState = nil
+        }
+        refreshMusicMetadata()
         refreshActiveAudioSources(processID: source.processID)
         refreshAvailableAudioSources()
         return true
@@ -487,6 +559,9 @@ final class PlaybackController: ObservableObject {
     }
 
     private func clearDisplayedSource() {
+        needsMusicMetadata = false
+        musicMetadataGeneration = UUID()
+        musicArtworkKey = nil
         confirmedMusicPlaying = nil
         applicationName = String(localized: "未在播放")
         bundleIdentifier = nil
