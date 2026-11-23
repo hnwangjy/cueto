@@ -3,6 +3,25 @@
     <channel>
         <title>Cueto</title>
         <item>
+            <title>1.3.8</title>
+            <pubDate>Mon, 23 Nov 2026 10:06:34 +0800</pubDate>
+            <link>https://github.com/hnwangjy/cueto</link>
+            <sparkle:version>24</sparkle:version>
+            <sparkle:shortVersionString>1.3.8</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.7</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Cueto 1.3.8
+
+播放进度，随手掌握。播放面板支持点击与拖动定位，拖动时同步预览已播放与剩余时间，松手后跳转，并保留播放或暂停状态。
+
+进度条从封面提取代表色，根据明暗外观调整亮度与对比度。悬停与按下时，轨道平滑放大、提亮；无可用主色时回归白色。
+
+Playback progress, within reach. Click or drag the progress bar to seek, with elapsed and remaining time previewed as you drag. Release to jump while preserving the current playback state.
+
+The progress bar draws its color from the artwork, adjusting brightness and contrast for light and dark appearances. Hover and press bring a smooth expansion and brighter feedback. When no suitable artwork color is available, the bar returns to white.
+]]></description>
+            <enclosure url="https://github.com/hnwangjy/cueto/releases/download/v1.3.8/Cueto-1.3.8.dmg" type="application/octet-stream" sparkle:edSignature="CVnMm7/QtHXevRXVl7TNtS8SR4OSAHYRv/K3hy2m+Gq7NV6HSv0KS3MtaeEWKS66X8UuaxHxEgE0ql+4GesdDw==" length="5201017"/>
+        </item>
+        <item>
             <title>1.3.7</title>
             <pubDate>Thu, 19 Nov 2026 21:55:46 +0800</pubDate>
             <link>https://github.com/hnwangjy/cueto</link>

@@ -18,9 +18,22 @@ final class PlaybackController: ObservableObject {
     @Published private(set) var isPlaying = false
     @Published private(set) var hasActiveSession = false
     @Published private(set) var applicationIcon: NSImage?
-    @Published private(set) var artwork: NSImage?
+    @Published private(set) var artwork: NSImage? {
+        didSet {
+            if artwork !== oldValue {
+                artworkPalette = artwork.flatMap(ArtworkProgressPalette.extract)
+            }
+        }
+    }
+    @Published private(set) var artworkPalette: ArtworkProgressPalette?
     private var artworkData: String?
     @Published private(set) var elapsedTime: TimeInterval?
+    @Published private(set) var seekError: String?
+    private var seekToken = UUID()
+    private var seekInFlight = false
+    private var seekSettlingUntil = Date.distantPast
+    private var lastSeekSampledAt = 0.0
+    var progressIdentity: String { "\(bundleIdentifier ?? "")|\(title ?? "")|\(artist ?? "")|\(duration ?? 0)" }
     @Published private(set) var duration: TimeInterval?
     @Published private(set) var activeAudioSources: [ActiveAudioSource] = []
     @Published private(set) var availableAudioSources: [ActiveAudioSource] = []
@@ -257,7 +270,7 @@ final class PlaybackController: ObservableObject {
                 self.title = state.title
                 self.artist = state.artist.nonEmpty
                 self.duration = state.duration
-                if state.sampledAt >= self.musicStateSampledAt {
+                if !self.seekInFlight, state.sampledAt >= max(self.musicStateSampledAt, self.lastSeekSampledAt) {
                     self.referenceElapsedTime = state.position + (state.playing ? max(0, ProcessInfo.processInfo.systemUptime - state.sampledAt) : 0)
                     self.referenceDate = Date()
                     self.applyMusicState(state.playing)
@@ -314,17 +327,55 @@ final class PlaybackController: ObservableObject {
 
     private func seek(by offset: TimeInterval) {
         guard let currentTime = currentElapsedTime else { return }
-        let upperBound = duration ?? .greatestFiniteMagnitude
-        let targetTime = min(max(currentTime + offset, 0), upperBound)
+        seek(to: currentTime + offset)
+    }
 
-        media.setTime(seconds: targetTime)
-        referenceElapsedTime = targetTime
+    func seek(to seconds: TimeInterval) {
+        guard hasActiveSession, seconds.isFinite else { return }
+        let upperBound = duration.flatMap { $0.isFinite && $0 > 0 ? $0 : nil } ?? .greatestFiniteMagnitude
+        let target = min(max(seconds, 0), upperBound)
+        let identity = progressIdentity
+        let token = UUID()
+        seekToken = token
+        seekError = nil
+        seekSettlingUntil = Date().addingTimeInterval(1.5)
+        referenceElapsedTime = target
         referenceDate = Date()
-        elapsedTime = targetTime
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-            self?.media.getTrackInfo { [weak self] info in
-                self?.receive(info)
+        elapsedTime = target
+        if bundleIdentifier == "com.apple.Music" {
+            seekInFlight = true
+            let expectedTitle = title
+            let expectedArtist = artist
+            musicQueue.async { [weak self] in
+                let (state, error) = AppleMusicPlayer.seek(to: target, expectedTitle: expectedTitle, expectedArtist: expectedArtist)
+                DispatchQueue.main.async {
+                    guard let self, self.seekToken == token else { return }
+                    self.seekInFlight = false
+                    guard self.progressIdentity == identity else { return }
+                    self.seekSettlingUntil = .distantPast
+                    if let state {
+                        self.lastSeekSampledAt = state.sampledAt
+                        self.referenceElapsedTime = state.position + (state.playing ? max(0, ProcessInfo.processInfo.systemUptime - state.sampledAt) : 0)
+                        self.referenceDate = Date()
+                        self.applyMusicState(state.playing)
+                    } else {
+                        self.seekError = error == -1743
+                            ? String(localized: "需要允许 Cueto 控制音乐，请在系统设置的自动化中授权。")
+                            : String(localized: "未能跳转，请重试")
+                        self.nextMusicMetadataRead = .distantPast
+                        self.refreshMusicMetadata()
+                        self.media.getTrackInfo { [weak self] info in self?.receive(info) }
+                    }
+                }
+            }
+        } else {
+            seekInFlight = false
+            media.setTime(seconds: target)
+            for delay in [0.35, 1.6] {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                    guard let self, self.seekToken == token, self.progressIdentity == identity else { return }
+                    self.media.getTrackInfo { [weak self] info in self?.receive(info) }
+                }
             }
         }
     }
@@ -421,6 +472,7 @@ final class PlaybackController: ObservableObject {
             needsMusicMetadata = false
             musicMetadataGeneration = UUID()
         }
+        let previousIdentity = progressIdentity
         applicationName = payload.applicationName?.nonEmpty ?? sourceName(for: payload.bundleIdentifier)
         if bundleIdentifier != payload.bundleIdentifier || artworkData != payload.artworkDataBase64 {
             artworkData = payload.artworkDataBase64
@@ -441,8 +493,19 @@ final class PlaybackController: ObservableObject {
         needsMusicMetadata = incompleteMusicInfo
         applicationIcon = icon(for: payload.bundleIdentifier)
         duration = payload.durationMicros.map { $0 / 1_000_000 }
-        referenceElapsedTime = payload.currentElapsedTime ?? payload.elapsedTimeMicros.map { $0 / 1_000_000 }
-        referenceDate = Date()
+        let reportedTime = payload.currentElapsedTime ?? payload.elapsedTimeMicros.map { $0 / 1_000_000 }
+        let sameItem = previousIdentity == progressIdentity
+        if !sameItem {
+            seekError = nil
+            seekSettlingUntil = .distantPast
+        }
+        // Ignore a stale pre-seek position while the player acknowledges the command.
+        let acknowledgesSeek = reportedTime.map { abs($0 - (currentElapsedTime ?? $0)) < 2 } ?? false
+        if !sameItem || (!seekInFlight && (Date() >= seekSettlingUntil || acknowledgesSeek)) {
+            referenceElapsedTime = reportedTime
+            referenceDate = Date()
+            seekSettlingUntil = .distantPast
+        }
         playbackRate = reportedPlaying ? (payload.playbackRate ?? 1) : 0
         refreshActiveAudioSources(processID: payload.PID)
         refreshAvailableAudioSources()

@@ -71,6 +71,34 @@ nonisolated enum AppleMusicPlayer {
                               sampledAt: ProcessInfo.processInfo.systemUptime))
     }
 
+    static func seek(to seconds: TimeInterval, expectedTitle: String?, expectedArtist: String?) -> (MusicSnapshot?, Int?) {
+        guard seconds.isFinite, let expectedTitle else { return (nil, -1) }
+        let (song, _, readError) = readTracks(includeUpcoming: false)
+        guard let song, song.title == expectedTitle, song.artist == (expectedArtist ?? "") else {
+            return (nil, readError ?? -1)
+        }
+        func quoted(_ value: String) -> String {
+            "\"" + value.replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "\"", with: "\\\"") + "\""
+        }
+        let script = """
+        with timeout of 2 seconds
+            if application id "com.apple.Music" is not running then return false
+            tell application id "com.apple.Music"
+                if player state is stopped then return false
+                if persistent ID of current track is not \(quoted(song.identifier)) then return false
+                set player position to \(min(max(seconds, 0), song.duration))
+                return true
+            end tell
+        end timeout
+        """
+        var error: NSDictionary?
+        let succeeded = NSAppleScript(source: script)?.executeAndReturnError(&error).booleanValue == true && error == nil
+        guard succeeded else { return (nil, (error?[NSAppleScript.errorNumber] as? Int) ?? -1) }
+        let (state, _, stateError) = readTracks(includeUpcoming: false)
+        return (state?.key == song.key ? state : nil, stateError)
+    }
+
     static func readArtwork(for identifier: String) -> Data? {
         // Persistent IDs are hexadecimal, never interpolated track titles.
         guard identifier.range(of: "^[0-9A-Fa-f]{16}$", options: .regularExpression) != nil else { return nil }

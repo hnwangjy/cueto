@@ -108,7 +108,9 @@ struct NowPlayingPopover: View {
             if let elapsedTime = playback.elapsedTime,
                let duration = playback.duration,
                duration > 0 {
-                playbackProgress(elapsedTime: elapsedTime, duration: duration)
+                PlaybackProgressView(elapsedTime: elapsedTime, duration: duration,
+                                     palette: playback.artworkPalette, error: playback.seekError, onSeek: playback.seek)
+                    .id(playback.progressIdentity)
             }
 
             let showsAppleLyrics = appleLyrics.isEnabled &&
@@ -154,30 +156,119 @@ struct NowPlayingPopover: View {
         .frame(width: 350)
     }
 
-    private func playbackProgress(elapsedTime: TimeInterval, duration: TimeInterval) -> some View {
-        let elapsed = min(max(elapsedTime, 0), duration)
-        let remaining = max(duration - elapsed, 0)
+}
 
-        return VStack(spacing: 6) {
-            ProgressView(value: elapsed, total: duration)
-                .progressViewStyle(.linear)
-                .tint(.accentColor)
-                .accessibilityLabel(String(localized: "播放进度"))
-                .accessibilityValue(String(localized: "已播放 \(formatTime(elapsed))，总时长 \(formatTime(duration))"))
+private struct PlaybackProgressView: View {
+    let elapsedTime: TimeInterval
+    let duration: TimeInterval
+    let palette: ArtworkProgressPalette?
+    let error: String?
+    let onSeek: (TimeInterval) -> Void
+    @State private var preview: TimeInterval?
+    @State private var hovering = false
+    @State private var keyboardAdjusting = false
+    @Environment(\.colorScheme) private var colorScheme
+    @FocusState private var focused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var elapsed: TimeInterval { min(max(preview ?? elapsedTime, 0), duration) }
+    private var interactionState: Int { preview != nil ? 2 : (hovering || keyboardAdjusting ? 1 : 0) }
+    private var trackHeight: CGFloat { interactionState == 2 ? 10 : (interactionState == 1 ? 8 : 4) }
+
+    private var fillColor: Color {
+        if let palette {
+            return Color(nsColor: palette.fill(isDark: colorScheme == .dark, interaction: interactionState).nsColor)
+        }
+        return .white.opacity(interactionState == 2 ? 1 : (interactionState == 1 ? 0.95 : 0.72))
+    }
+    private var railColor: Color {
+        palette == nil ? Color(white: 0.32 + Double(interactionState) * 0.025)
+            : Color(nsColor: ArtworkProgressPalette.track(isDark: colorScheme == .dark, interaction: interactionState).nsColor)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            GeometryReader { geometry in
+                let width = max(geometry.size.width, 1)
+                let fraction = elapsed / duration
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(railColor)
+                        .overlay {
+                            Capsule().strokeBorder(.black.opacity(0.05), lineWidth: 0.5)
+                        }
+                    Capsule()
+                        .fill(fillColor)
+                        .frame(width: max(0, width * fraction))
+                }
+                .frame(height: trackHeight)
+                .shadow(color: .black.opacity(interactionState == 0 ? 0 : 0.06), radius: 2, y: 1)
+                .frame(maxHeight: .infinity)
+                .overlay(alignment: .leading) {
+                    Circle().fill(fillColor)
+                        .frame(width: trackHeight, height: trackHeight)
+                        .offset(x: min(max(width * fraction - trackHeight / 2, 0), max(width - trackHeight, 0)))
+                        .opacity(interactionState == 0 ? 0 : 1)
+                        .allowsHitTesting(false)
+                }
+                .contentShape(Rectangle())
+                .gesture(DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        preview = min(max(value.location.x / width, 0), 1) * duration
+                    }
+                    .onEnded { value in
+                        let target = min(max(value.location.x / width, 0), 1) * duration
+                        onSeek(target)
+                        preview = nil
+                    })
+                .onHover {
+                    hovering = $0
+                    keyboardAdjusting = false
+                }
+                .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.86), value: interactionState)
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: palette)
+            }
+            .frame(height: 22)
+            .focusable()
+            .focused($focused)
+            .focusEffectDisabled()
+            .onChange(of: focused) { _, focused in
+                if !focused { keyboardAdjusting = false }
+            }
+            .onKeyPress(.leftArrow) {
+                keyboardAdjusting = true
+                onSeek(max(elapsed - 5, 0))
+                return .handled
+            }
+            .onKeyPress(.rightArrow) {
+                keyboardAdjusting = true
+                onSeek(min(elapsed + 5, duration))
+                return .handled
+            }
+            .accessibilityRepresentation {
+                Slider(value: Binding(get: { elapsed }, set: onSeek), in: 0...duration)
+                    .accessibilityLabel(String(localized: "播放进度"))
+                    .accessibilityValue(String(localized: "已播放 \(formatTime(elapsed))，总时长 \(formatTime(duration))"))
+            }
 
             HStack(spacing: 8) {
                 Text(formatTime(elapsed))
+                    .foregroundStyle(preview != nil ? .primary : .secondary)
                     .accessibilityLabel(String(localized: "已播放 \(formatTime(elapsed))"))
                 Spacer()
                 Text(String(localized: "共 \(formatTime(duration))"))
-                    .foregroundStyle(.secondary)
                     .accessibilityLabel(String(localized: "总时长 \(formatTime(duration))"))
                 Spacer()
-                Text("−\(formatTime(remaining))")
-                    .accessibilityLabel(String(localized: "剩余 \(formatTime(remaining))"))
+                Text("−\(formatTime(max(duration - elapsed, 0)))")
+                    .accessibilityLabel(String(localized: "剩余 \(formatTime(max(duration - elapsed, 0)))"))
             }
             .font(.system(size: 10, weight: .medium, design: .monospaced))
             .foregroundStyle(.secondary)
+
+            if let error {
+                Text(error).font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(.top, 6)
+            }
         }
     }
 
@@ -186,9 +277,7 @@ struct NowPlayingPopover: View {
         let hours = totalSeconds / 3_600
         let minutes = (totalSeconds % 3_600) / 60
         let seconds = totalSeconds % 60
-        if hours > 0 {
-            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
-        }
+        if hours > 0 { return String(format: "%d:%02d:%02d", hours, minutes, seconds) }
         return String(format: "%d:%02d", minutes, seconds)
     }
 }
