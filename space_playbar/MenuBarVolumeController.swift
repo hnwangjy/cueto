@@ -23,7 +23,6 @@ final class MenuBarVolumeController {
     private var hovered = false
     private let display = VolumeDisplay()
     private static let panelSize = NSSize(width: 198, height: 44)
-    private static let slideDistance: CGFloat = 10
 
     init(anchor: NSView) {
         self.anchor = anchor
@@ -62,9 +61,9 @@ final class MenuBarVolumeController {
         let id = UUID()
         retractionID = id
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.16
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            panel.animator().setFrame(destination.offsetBy(dx: 0, dy: Self.slideDistance), display: false)
+            context.duration = 0.13
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.4, 0, 1, 1)
+            panel.animator().setFrame(Self.collapsedFrame(for: destination), display: false)
             panel.animator().alphaValue = 0
         } completionHandler: { [weak self, weak panel] in
             guard let self, self.retractionID == id else { return }
@@ -119,6 +118,13 @@ final class MenuBarVolumeController {
         return window.convertToScreen(anchor.convert(anchor.visibleRect, to: nil))
     }
 
+    private static func collapsedFrame(for frame: NSRect) -> NSRect {
+        let scale: CGFloat = 0.965
+        let width = frame.width * scale
+        let height = frame.height * scale
+        return NSRect(x: frame.midX - width / 2, y: frame.maxY + 3 - height, width: width, height: height)
+    }
+
     private func show(_ volume: Float) {
         guard let rect = anchorRect(), let screen = anchor?.window?.screen else { return }
         display.value = Double(volume)
@@ -148,13 +154,12 @@ final class MenuBarVolumeController {
 
         if !window.isVisible {
             window.alphaValue = 0
-            window.setFrame(destination.offsetBy(dx: 0, dy: Self.slideDistance), display: false)
+            window.setFrame(Self.collapsedFrame(for: destination), display: false)
             window.orderFrontRegardless()
         }
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.20
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            // Move the existing backing surface without requesting a redraw of the content.
+            context.duration = 0.17
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.18, 0.7, 0.26, 1)
             window.animator().setFrame(destination, display: false)
             window.animator().alphaValue = 1
         }

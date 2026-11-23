@@ -173,21 +173,23 @@ private struct PlaybackProgressView: View {
 
     private var elapsed: TimeInterval { min(max(preview ?? elapsedTime, 0), duration) }
     private var interactionState: Int { preview != nil ? 2 : (hovering || keyboardAdjusting ? 1 : 0) }
-    private var trackHeight: CGFloat { interactionState == 2 ? 10 : (interactionState == 1 ? 8 : 4) }
+    private var trackHeight: CGFloat { interactionState == 2 ? 12 : (interactionState == 1 ? 9 : 6) }
+    private var thumbDiameter: CGFloat { interactionState == 2 ? 15 : (interactionState == 1 ? 13 : 0) }
+    private var shapeMotion: Animation? {
+        reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.86)
+    }
 
     private var fillColor: Color {
         if let palette {
-            return Color(nsColor: palette.fill(isDark: colorScheme == .dark, interaction: interactionState).nsColor)
+            return Color(nsColor: palette.fill(isDark: colorScheme == .dark, interaction: 0).nsColor)
         }
-        if colorScheme == .light { return Color(white: 0.43 + Double(interactionState) * 0.015) }
-        return .white.opacity(interactionState == 2 ? 1 : (interactionState == 1 ? 0.95 : 0.72))
+        return colorScheme == .light ? Color(white: 0.43) : .white.opacity(0.72)
     }
     private var railColor: Color {
         if let palette {
-            return Color(nsColor: palette.track(isDark: colorScheme == .dark, interaction: interactionState).nsColor)
+            return Color(nsColor: palette.track(isDark: colorScheme == .dark).nsColor)
         }
-        let base = colorScheme == .dark ? 0.32 : 0.90
-        return Color(white: base + Double(interactionState) * 0.025)
+        return Color(white: colorScheme == .dark ? 0.32 : 0.90)
     }
 
     var body: some View {
@@ -195,21 +197,24 @@ private struct PlaybackProgressView: View {
             GeometryReader { geometry in
                 let width = max(geometry.size.width, 1)
                 let fraction = elapsed / duration
+                let thumbBounds: CGFloat = 16
+                let thumbRadius = thumbBounds / 2
                 ZStack(alignment: .leading) {
-                    Capsule()
+                    ProgressPill(height: trackHeight)
                         .fill(railColor)
-                    Capsule()
+                        .animation(shapeMotion, value: trackHeight)
+                    ProgressPill(height: trackHeight)
                         .fill(fillColor)
+                        .animation(shapeMotion, value: trackHeight)
                         .frame(width: max(0, width * fraction))
                 }
-                .frame(height: trackHeight)
-                .shadow(color: .black.opacity(interactionState == 0 ? 0 : 0.06), radius: 2, y: 1)
-                .frame(maxHeight: .infinity)
+                .frame(width: width, height: geometry.size.height)
                 .overlay(alignment: .leading) {
-                    Circle().fill(fillColor)
-                        .frame(width: trackHeight, height: trackHeight)
-                        .offset(x: min(max(width * fraction - trackHeight / 2, 0), max(width - trackHeight, 0)))
-                        .opacity(interactionState == 0 ? 0 : 1)
+                    ProgressPill(height: thumbDiameter, expandsHorizontally: false)
+                        .fill(fillColor)
+                        .animation(shapeMotion, value: thumbDiameter)
+                        .frame(width: thumbBounds, height: thumbBounds)
+                        .offset(x: min(max(width * fraction - thumbRadius, 0), max(width - thumbBounds, 0)))
                         .allowsHitTesting(false)
                 }
                 .contentShape(Rectangle())
@@ -226,7 +231,6 @@ private struct PlaybackProgressView: View {
                     hovering = $0
                     keyboardAdjusting = false
                 }
-                .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.86), value: interactionState)
                 .animation(reduceMotion ? nil : .easeInOut(duration: 0.3), value: palette)
             }
             .frame(height: 22)
@@ -280,6 +284,25 @@ private struct PlaybackProgressView: View {
         let seconds = totalSeconds % 60
         if hours > 0 { return String(format: "%d:%02d:%02d", hours, minutes, seconds) }
         return String(format: "%d:%02d", minutes, seconds)
+    }
+}
+
+private struct ProgressPill: Shape {
+    var height: CGFloat
+    var expandsHorizontally = true
+
+    var animatableData: CGFloat {
+        get { height }
+        set { height = newValue }
+    }
+
+    func path(in rect: CGRect) -> Path {
+        let height = min(max(height, 0), rect.height)
+        let width = expandsHorizontally ? rect.width : min(height, rect.width)
+        guard height > 0, width > 0 else { return Path() }
+        let bounds = CGRect(x: rect.midX - width / 2, y: rect.midY - height / 2, width: width, height: height)
+        let radius = min(height, width) / 2
+        return Path(roundedRect: bounds, cornerRadius: radius)
     }
 }
 

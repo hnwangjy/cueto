@@ -3,6 +3,23 @@
     <channel>
         <title>Cueto</title>
         <item>
+            <title>1.4.0</title>
+            <pubDate>Mon, 23 Nov 2026 15:37:59 +0800</pubDate>
+            <link>https://github.com/hnwangjy/cueto</link>
+            <sparkle:version>26</sparkle:version>
+            <sparkle:shortVersionString>1.4.0</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.7</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Cueto 1.4.0
+
+- 悬停菜单栏控制区时，音量浮层轻微放大并向下展开，移开指针后向上收回。
+- 播放进度条采用更纤细的圆角轨道，悬停时平滑变粗，拖动圆点从当前进度展开。
+
+- Hover over the menu bar controls to reveal the volume indicator with a subtle scale and downward motion. Move the pointer away to retract it upward.
+- The playback progress bar has a slimmer rounded track that expands smoothly on hover, with the scrubber growing from the current position.
+]]></description>
+            <enclosure url="https://github.com/hnwangjy/cueto/releases/download/v1.4.0/Cueto-1.4.0.dmg" type="application/octet-stream" sparkle:edSignature="7uI0w0RuRqwfFxIbPeoiRfAgwMhw+Kgj700ZSm3sBuBvTSC5f/kji4foUvr8xKs17JrX+VbuUm/6iQTMgH7wBA==" length="5270754"/>
+        </item>
+        <item>
             <title>1.3.9</title>
             <pubDate>Mon, 23 Nov 2026 14:56:23 +0800</pubDate>
             <link>https://github.com/hnwangjy/cueto</link>
