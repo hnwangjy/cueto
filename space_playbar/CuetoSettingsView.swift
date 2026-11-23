@@ -93,6 +93,7 @@ final class CuetoSettingsModel: ObservableObject {
 
 struct CuetoSettingsView: View {
     @AppStorage("openPanelAtNotch") private var openPanelAtNotch = true
+    @AppStorage(PlaybackController.cosmosResumeRecoveryPreference) private var recoverCosmosAudioOnResume = false
     @ObservedObject var model: CuetoSettingsModel
     @ObservedObject var excludedApps: ExcludedAudioApps
     @ObservedObject var subtitles: CosmosSubtitleMonitor
@@ -399,6 +400,13 @@ struct CuetoSettingsView: View {
                 }
 
 
+            }
+            .modifier(SettingsCardMaterial())
+            settingRow(title: String(localized: "续播音频恢复")) {
+                Toggle("", isOn: $recoverCosmosAudioOnResume)
+                    .labelsHidden().toggleStyle(.switch)
+                    .accessibilityLabel(String(localized: "续播音频恢复"))
+                    .help(String(localized: "续播前重新定位到暂停位置，缓解小宇宙播放无声。"))
             }
             .modifier(SettingsCardMaterial())
             VStack(alignment: .leading, spacing: 0) {

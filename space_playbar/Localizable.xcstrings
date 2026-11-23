@@ -2431,6 +2431,54 @@
         }
       }
     },
+    "续播音频恢复": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore Audio on Resume"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "续播音频恢复"
+          }
+        }
+      }
+    },
+    "续播前重新定位到暂停位置，缓解小宇宙播放无声。": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reposition to the paused timestamp before resuming to help prevent silent playback in Xiaoyuzhou."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "续播前重新定位到暂停位置，缓解小宇宙播放无声。"
+          }
+        }
+      }
+    },
+    "系统音量": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System Volume"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系统音量"
+          }
+        }
+      }
+    },
     "小宇宙异常退出后自动恢复": {
       "localizations": {
         "en": {

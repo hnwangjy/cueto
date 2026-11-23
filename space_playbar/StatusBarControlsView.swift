@@ -179,11 +179,15 @@ private struct PlaybackProgressView: View {
         if let palette {
             return Color(nsColor: palette.fill(isDark: colorScheme == .dark, interaction: interactionState).nsColor)
         }
+        if colorScheme == .light { return Color(white: 0.43 + Double(interactionState) * 0.015) }
         return .white.opacity(interactionState == 2 ? 1 : (interactionState == 1 ? 0.95 : 0.72))
     }
     private var railColor: Color {
-        palette == nil ? Color(white: 0.32 + Double(interactionState) * 0.025)
-            : Color(nsColor: ArtworkProgressPalette.track(isDark: colorScheme == .dark, interaction: interactionState).nsColor)
+        if let palette {
+            return Color(nsColor: palette.track(isDark: colorScheme == .dark, interaction: interactionState).nsColor)
+        }
+        let base = colorScheme == .dark ? 0.32 : 0.90
+        return Color(white: base + Double(interactionState) * 0.025)
     }
 
     var body: some View {
@@ -194,9 +198,6 @@ private struct PlaybackProgressView: View {
                 ZStack(alignment: .leading) {
                     Capsule()
                         .fill(railColor)
-                        .overlay {
-                            Capsule().strokeBorder(.black.opacity(0.05), lineWidth: 0.5)
-                        }
                     Capsule()
                         .fill(fillColor)
                         .frame(width: max(0, width * fraction))
@@ -262,7 +263,7 @@ private struct PlaybackProgressView: View {
                 Text("−\(formatTime(max(duration - elapsed, 0)))")
                     .accessibilityLabel(String(localized: "剩余 \(formatTime(max(duration - elapsed, 0)))"))
             }
-            .font(.system(size: 10, weight: .medium, design: .monospaced))
+            .font(.system(size: 11, weight: .medium).monospacedDigit())
             .foregroundStyle(.secondary)
 
             if let error {
@@ -426,7 +427,7 @@ struct AppleMusicLyricsPanel: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if let cue {
                     Text(String(format: "%d:%02d", Int(cue.time) / 60, Int(cue.time) % 60))
-                        .font(.system(size: 10, design: .monospaced))
+                        .font(.system(size: 11, weight: .medium).monospacedDigit())
                         .foregroundStyle(.secondary)
                 }
             }

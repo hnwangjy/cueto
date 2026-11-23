@@ -14,7 +14,10 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
     private let onOpenCueto: () -> Void
     private let onQuit: () -> Void
     private var observations = Set<AnyCancellable>()
-    private var popover: NSPopover?
+    private var popover: NSPopover? {
+        didSet { volumeController?.isSuspended = popover != nil }
+    }
+    private var volumeController: MenuBarVolumeController?
     private let separator = NSBox()
     private var sourceWidthConstraint: NSLayoutConstraint?
     private var isIdleState = false
@@ -116,6 +119,12 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        volumeController?.stop()
+        volumeController = nil
+        if window != nil, routesThroughStatusButton {
+            volumeController = MenuBarVolumeController(anchor: self)
+            volumeController?.isSuspended = popover != nil
+        }
         refreshAppearance()
     }
 
@@ -125,6 +134,7 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
     }
 
     override func rightMouseDown(with event: NSEvent) {
+        volumeController?.dismiss()
         let menu = NSMenu()
         menu.addItem(withTitle: String(localized: "打开 Cueto"), action: #selector(openCueto), keyEquivalent: "")
         menu.addItem(.separator())
@@ -215,6 +225,7 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
 
         playback.$isPlaying
             .removeDuplicates()
+            .combineLatest(playback.$cosmosPendingPlayback.removeDuplicates())
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.refreshPlaybackState() }
             .store(in: &observations)
@@ -279,7 +290,8 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
     }
 
     private func refreshPlaybackState() {
-        let isPlaying = playback.isPlaying
+        let isPlaying = (playback.bundleIdentifier == "app.podcast.cosmos" ? playback.cosmosPendingPlayback : nil)
+            ?? playback.isPlaying
         let label = isPlaying ? String(localized: "暂停") : String(localized: "播放")
         playPauseButton.kind = .symbol(isPlaying ? "pause.fill" : "play.fill")
         playPauseButton.toolTip = label
@@ -320,10 +332,8 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
     }
 
     @objc private func showNowPlaying() {
-        if let popover, popover.isShown {
-            sourceButton.showsSelection = false
-            popover.performClose(nil)
-            self.popover = nil
+        if let popover {
+            if popover.isShown { popover.performClose(nil) }
             return
         }
 
@@ -376,6 +386,7 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
     }
 
     func popoverDidClose(_ notification: Notification) {
+        guard let closed = notification.object as? NSPopover, closed === popover else { return }
         sourceButton.showsSelection = false
         popover = nil
     }

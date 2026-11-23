@@ -6,6 +6,8 @@ import OSLog
 
 @MainActor
 final class PlaybackController: ObservableObject {
+    static let cosmosResumeRecoveryPreference = "recoverCosmosAudioOnResume"
+
     enum TransportMode {
         case timeSkipping
         case trackNavigation
@@ -102,6 +104,8 @@ final class PlaybackController: ObservableObject {
     private var pendingPlaybackState: Bool?
     private var pendingStateDeadline = Date.distantPast
     private var pendingStateToken = UUID()
+    private var cosmosPlaybackRequest: UUID?
+    @Published private(set) var cosmosPendingPlayback: Bool?
 
     var transportMode: TransportMode {
         guard let bundleIdentifier = bundleIdentifier?.lowercased() else {
@@ -185,6 +189,10 @@ final class PlaybackController: ObservableObject {
             toggleMusicPlayback()
             return
         }
+        if bundleIdentifier == "app.podcast.cosmos" {
+            toggleCosmosPlayback()
+            return
+        }
 
         let targetState = !isPlaying
         pendingPlaybackState = targetState
@@ -204,6 +212,87 @@ final class PlaybackController: ObservableObject {
             self.pendingPlaybackState = nil
             self.media.getTrackInfo { [weak self] info in
                 self?.receive(info)
+            }
+        }
+    }
+
+    private func toggleCosmosPlayback() {
+        guard cosmosPlaybackRequest == nil else { return }
+        let request = UUID()
+        cosmosPlaybackRequest = request
+        let targetState = !isPlaying
+        cosmosPendingPlayback = targetState
+        pendingPlaybackState = nil
+        pendingStateToken = UUID()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+            guard self?.cosmosPlaybackRequest == request else { return }
+            self?.finishCosmosPlaybackRequest()
+        }
+        media.getTrackInfo { [weak self] info in
+            guard let self, self.cosmosPlaybackRequest == request else { return }
+            guard self.bundleIdentifier == "app.podcast.cosmos",
+                  let payload = info?.payload, payload.bundleIdentifier == "app.podcast.cosmos" else {
+                self.finishCosmosPlaybackRequest()
+                return
+            }
+            let playing = payload.isPlaying ?? ((payload.playbackRate ?? 0) > 0)
+            self.receive(info)
+            guard playing != targetState, self.bundleIdentifier == "app.podcast.cosmos" else {
+                self.finishCosmosPlaybackRequest()
+                return
+            }
+            // Reposition while silent so an already audible stream is never rewound.
+            if targetState, UserDefaults.standard.bool(forKey: Self.cosmosResumeRecoveryPreference),
+               let position = payload.elapsedTimeMicros.map({ $0 / 1_000_000 }) ?? payload.currentElapsedTime,
+               position.isFinite {
+                let seekToken = self.seekToken
+                self.media.setTime(seconds: max(0, position))
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { [weak self] in
+                    guard let self, self.cosmosPlaybackRequest == request else { return }
+                    // Re-read the session after the seek instead of relying on its prior state.
+                    self.media.getTrackInfo { [weak self] prepared in
+                        guard let self, self.cosmosPlaybackRequest == request else { return }
+                        guard self.bundleIdentifier == "app.podcast.cosmos",
+                              let current = prepared?.payload,
+                              current.bundleIdentifier == "app.podcast.cosmos",
+                              current.PID == payload.PID, current.uniqueIdentifier == payload.uniqueIdentifier,
+                              self.seekToken == seekToken else {
+                            self.finishCosmosPlaybackRequest()
+                            return
+                        }
+                        self.receive(prepared)
+                        guard self.cosmosPlaybackRequest == request,
+                              self.bundleIdentifier == "app.podcast.cosmos" else { return }
+                        self.sendCosmosPlaybackCommand(playing: true, request: request)
+                    }
+                }
+            } else {
+                self.sendCosmosPlaybackCommand(playing: targetState, request: request)
+            }
+        }
+    }
+
+    private func finishCosmosPlaybackRequest() {
+        cosmosPlaybackRequest = nil
+        cosmosPendingPlayback = nil
+    }
+
+    private func sendCosmosPlaybackCommand(playing: Bool, request: UUID) {
+        if playing {
+            // Cosmos can ignore explicit Play while paused. Its toggle handles resume.
+            media.togglePlayPause()
+        } else {
+            media.pause()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.65) { [weak self] in
+            guard let self, self.cosmosPlaybackRequest == request else { return }
+            self.media.getTrackInfo { [weak self] confirmed in
+                guard let self, self.cosmosPlaybackRequest == request else { return }
+                self.finishCosmosPlaybackRequest()
+                guard self.bundleIdentifier == "app.podcast.cosmos",
+                      confirmed?.payload.bundleIdentifier == "app.podcast.cosmos" else { return }
+                self.receive(confirmed)
             }
         }
     }
@@ -430,6 +519,10 @@ final class PlaybackController: ObservableObject {
         }
 
         let systemReportedPlaying = payload.isPlaying ?? ((payload.playbackRate ?? 0) > 0)
+        if let target = cosmosPendingPlayback,
+           payload.bundleIdentifier != "app.podcast.cosmos" || systemReportedPlaying == target {
+            finishCosmosPlaybackRequest()
+        }
         let reportedPlaying = payload.bundleIdentifier == "com.apple.Music" && hasRecentMusicState
             ? (confirmedMusicPlaying ?? systemReportedPlaying) : systemReportedPlaying
         if let identifier = payload.bundleIdentifier {

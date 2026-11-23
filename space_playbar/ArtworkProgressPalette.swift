@@ -31,23 +31,41 @@ struct ArtworkProgressPalette: Equatable {
 
     let keyColor: RGB
 
-    static func track(isDark: Bool, interaction: Int = 0) -> RGB {
+    func track(isDark: Bool, interaction: Int = 0) -> RGB {
         let level = Double(min(max(interaction, 0), 2))
-        let value = isDark ? 0.28 + 0.02 * level : 0.86 + 0.025 * level
+        let value = isDark ? 0.28 + 0.02 * level : 0.90 + 0.015 * level
         return RGB(r: value, g: value, b: value)
     }
 
     func fill(isDark: Bool, interaction: Int) -> RGB {
-        // Soften highly saturated artwork, then shift luminance for the actual rail.
+        let isBrightArtwork = keyColor.luminance >= 0.48
+        let level = Double(min(max(interaction, 0), 2))
         let maxChannel = max(keyColor.r, keyColor.g, keyColor.b)
         let minChannel = min(keyColor.r, keyColor.g, keyColor.b)
         let neutral = RGB(r: maxChannel, g: maxChannel, b: maxChannel)
         let saturation = maxChannel > 0 ? (maxChannel - minChannel) / maxChannel : 0
-        var color = saturation > 0.68
-            ? keyColor.mixed(with: neutral, amount: 1 - 0.68 / saturation) : keyColor
-        color = color.mixed(with: isDark ? .white : .black, amount: isDark ? 0.32 : 0.18)
-        color = color.mixed(with: .white, amount: Double(min(max(interaction, 0), 2)) * 0.08)
-        let rail = Self.track(isDark: isDark, interaction: interaction)
+        let saturationLimit = isBrightArtwork ? 0.48 : 0.68
+        var color = saturation > saturationLimit
+            ? keyColor.mixed(with: neutral, amount: 1 - saturationLimit / saturation) : keyColor
+        if isBrightArtwork {
+            // Move vivid yellows slightly toward gold before lowering brightness.
+            if keyColor.g >= keyColor.r * 0.82, keyColor.g <= keyColor.r * 1.03,
+               keyColor.b < keyColor.g * 0.72 {
+                if isDark {
+                    color = RGB(r: color.r, g: color.g - (color.g - color.b) * 0.17, b: color.b)
+                } else {
+                    // A warmer hue stays clean when yellow must be readable on a pale rail.
+                    let apricot = RGB(r: 0.76, g: 0.40, b: 0.29)
+                    color = apricot.mixed(with: color, amount: 0.07)
+                }
+            }
+            if isDark { color = color.mixed(with: .black, amount: 0.16) }
+            color = color.mixed(with: .white, amount: level * 0.025)
+        } else {
+            if isDark { color = color.mixed(with: .white, amount: 0.32) }
+            color = color.mixed(with: .white, amount: level * 0.08)
+        }
+        let rail = track(isDark: isDark, interaction: interaction)
         let destination: RGB = isDark ? .white : .black
         let original = color
         // Keep every interaction state distinct from the rail, including very dark/bright covers.

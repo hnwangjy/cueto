@@ -3,6 +3,25 @@
     <channel>
         <title>Cueto</title>
         <item>
+            <title>1.3.9</title>
+            <pubDate>Mon, 23 Nov 2026 14:56:23 +0800</pubDate>
+            <link>https://github.com/hnwangjy/cueto</link>
+            <sparkle:version>25</sparkle:version>
+            <sparkle:shortVersionString>1.3.9</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.7</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Cueto 1.3.9
+
+将指针停在 Cueto 菜单栏控制区，即可用滚轮调节系统输出音量。音量条以磨砂浮层滑出，播放和暂停时保持稳定，展开播放面板时自动收起。
+
+播放进度和歌词时间戳采用更清晰的系统字体，进度条配色更柔和。小宇宙新增实验性续播音频恢复，可在发生暂停后续播无声时开启。
+
+Hover over Cueto’s menu bar controls and scroll to adjust the system output volume. The frosted volume indicator slides into view, stays visible when you use playback controls, and disappears when the playback panel opens.
+
+Playback times and lyric timestamps use a clearer system font, and the progress bar uses softer artwork colors. An optional Xiaoyuzhou experiment helps restore audio if playback resumes silently after a pause.
+]]></description>
+            <enclosure url="https://github.com/hnwangjy/cueto/releases/download/v1.3.9/Cueto-1.3.9.dmg" type="application/octet-stream" sparkle:edSignature="89FQQw8y6WAkLZQchyKHE+oVG7ieUOuLvndpuBv80YiDDLVaGGMbAit9JtOvUcpIui00XSb4gi8dKp9Mo/E4Ag==" length="5271502"/>
+        </item>
+        <item>
             <title>1.3.8</title>
             <pubDate>Mon, 23 Nov 2026 10:06:34 +0800</pubDate>
             <link>https://github.com/hnwangjy/cueto</link>

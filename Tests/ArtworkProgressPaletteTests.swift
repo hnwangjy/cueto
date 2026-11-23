@@ -23,15 +23,21 @@ struct ArtworkProgressPaletteTests {
         assert(red.keyColor.r > red.keyColor.b * 2)
         let blue = ArtworkProgressPalette.extract(from: image(NSColor(srgbRed: 0.12, green: 0.35, blue: 0.9, alpha: 1)))!
         assert(blue.keyColor.b > blue.keyColor.r * 2)
-        let colors = [red.keyColor, blue.keyColor, .white, .black,
+        let yellow = ArtworkProgressPalette.extract(from: image(NSColor(srgbRed: 1, green: 0.93, blue: 0.28, alpha: 1), accent: .black))!
+        for state in 0...2 {
+            let gold = yellow.fill(isDark: false, interaction: state)
+            assert(gold.r < 0.83 && gold.r - gold.g > 0.18 && gold.g - gold.b > 0.10)
+        }
+        let colors = [red.keyColor, blue.keyColor, yellow.keyColor, .white, .black,
                       .init(r: 1, g: 1, b: 0), .init(r: 0, g: 1, b: 0), .init(r: 0.08, g: 0.02, b: 0.04)]
         for key in colors {
             let palette = ArtworkProgressPalette(keyColor: key)
             for dark in [false, true] {
                 for state in 0...2 {
                     let fill = palette.fill(isDark: dark, interaction: state)
-                    let track = ArtworkProgressPalette.track(isDark: dark, interaction: state)
+                    let track = palette.track(isDark: dark, interaction: state)
                     assert(fill.contrast(with: track) >= 3.5)
+                    if !dark { assert(track.r >= 0.90) }
                     assert([fill.r, fill.g, fill.b].allSatisfy { $0.isFinite && (0...1).contains($0) })
                 }
             }
