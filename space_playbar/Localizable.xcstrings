@@ -1,6 +1,22 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "音量触觉反馈": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volume Haptics"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音量触觉反馈"
+          }
+        }
+      }
+    },
     "%@，正在重试…": {
       "localizations": {
         "en": {

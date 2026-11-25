@@ -93,6 +93,7 @@ final class CuetoSettingsModel: ObservableObject {
 
 struct CuetoSettingsView: View {
     @AppStorage("openPanelAtNotch") private var openPanelAtNotch = true
+    @AppStorage(MenuBarVolumeController.hapticsPreferenceKey) private var menuBarVolumeHapticsEnabled = true
     @AppStorage(PlaybackController.cosmosResumeRecoveryPreference) private var recoverCosmosAudioOnResume = false
     @ObservedObject var model: CuetoSettingsModel
     @ObservedObject var excludedApps: ExcludedAudioApps
@@ -256,6 +257,12 @@ struct CuetoSettingsView: View {
                     Toggle("", isOn: Binding(get: { model.automaticallyChecksForUpdates }, set: model.setAutomaticallyChecksForUpdates))
                         .labelsHidden().toggleStyle(.switch)
                         .accessibilityLabel(String(localized: "自动检查更新"))
+                }
+                Divider().padding(.horizontal, 16)
+                settingRow(title: String(localized: "音量触觉反馈")) {
+                    Toggle("", isOn: $menuBarVolumeHapticsEnabled)
+                        .labelsHidden().toggleStyle(.switch)
+                        .accessibilityLabel(String(localized: "音量触觉反馈"))
                 }
             }
             .modifier(SettingsCardMaterial())

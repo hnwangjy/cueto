@@ -148,7 +148,6 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
         separator.translatesAutoresizingMaskIntoConstraints = false
 
         sourceButton.kind = .source
-        sourceButton.toolTip = String(localized: "查看当前播放来源")
         sourceButton.setAccessibilityLabel(String(localized: "当前播放来源"))
         sourceButton.setContentHuggingPriority(.defaultLow, for: .horizontal)
         sourceButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
@@ -202,7 +201,6 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
     private func makeSymbolButton(symbol: String, label: String, action: Selector) -> StatusBarNativeButton {
         let button = makeButton(action: action)
         button.kind = .symbol(symbol)
-        button.toolTip = label
         button.setAccessibilityLabel(label)
         return button
     }
@@ -284,7 +282,6 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
         forwardButton.isHidden = idle
         sourceWidthConstraint?.constant = idle ? 0 : -80
         sourceButton.isIdleState = idle
-        sourceButton.toolTip = idle ? String(localized: "打开 Cueto") : String(localized: "查看当前播放来源")
         sourceButton.setAccessibilityLabel(idle ? String(localized: "打开 Cueto") : String(localized: "当前播放来源"))
         needsLayout = true
     }
@@ -294,7 +291,6 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
             ?? playback.isPlaying
         let label = isPlaying ? String(localized: "暂停") : String(localized: "播放")
         playPauseButton.kind = .symbol(isPlaying ? "pause.fill" : "play.fill")
-        playPauseButton.toolTip = label
         playPauseButton.setAccessibilityLabel(label)
         refreshAppearance()
     }
@@ -318,7 +314,6 @@ final class StatusBarControlView: NSView, NSPopoverDelegate {
     }
 
     private func update(button: StatusBarNativeButton, label: String) {
-        button.toolTip = label
         button.setAccessibilityLabel(label)
     }
 

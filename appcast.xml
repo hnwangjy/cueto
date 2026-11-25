@@ -3,6 +3,25 @@
     <channel>
         <title>Cueto</title>
         <item>
+            <title>1.4.1</title>
+            <pubDate>Wed, 25 Nov 2026 13:05:07 +0800</pubDate>
+            <link>https://github.com/hnwangjy/cueto</link>
+            <sparkle:version>27</sparkle:version>
+            <sparkle:shortVersionString>1.4.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>26.7</sparkle:minimumSystemVersion>
+            <description sparkle:format="markdown"><![CDATA[# Cueto 1.4.1
+
+- 双指调节菜单栏音量时，每跨过 5% 提供一次触觉反馈，可在「设置 → 通用」中关闭。
+- 触控板和鼠标向上滚动提高音量，向下滚动降低音量。
+- 歌词固定显示在播放控制左侧，音量条展开时无遮挡。
+
+- When you adjust menu bar volume with a two-finger gesture, the trackpad provides feedback at 5% intervals. Turn it off in Settings → General.
+- Scroll up to raise the volume and down to lower it on a trackpad or mouse.
+- Lyrics stay to the left of the playback controls, and the volume indicator stays clear of tooltips.
+]]></description>
+            <enclosure url="https://github.com/hnwangjy/cueto/releases/download/v1.4.1/Cueto-1.4.1.dmg" type="application/octet-stream" sparkle:edSignature="tFrbRV8tPIkajCTE7ZfG/+5QWp+tAgWfmOOufShFc4o06mG39Bx1ldyM6BLlHyhKUIbtxFWqs3lV/DsCWr6uCA==" length="5275112"/>
+        </item>
+        <item>
             <title>1.4.0</title>
             <pubDate>Mon, 23 Nov 2026 15:37:59 +0800</pubDate>
             <link>https://github.com/hnwangjy/cueto</link>

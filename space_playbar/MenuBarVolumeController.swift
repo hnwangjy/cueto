@@ -7,6 +7,8 @@ import SwiftUI
 
 @MainActor
 final class MenuBarVolumeController {
+    static let hapticsPreferenceKey = "menuBarVolumeHapticsEnabled"
+
     var isSuspended = false {
         didSet {
             if isSuspended { dismiss() }
@@ -98,17 +100,25 @@ final class MenuBarVolumeController {
               abs(event.scrollingDeltaY) > abs(event.scrollingDeltaX),
               let output = SystemOutputVolume.current() else { return false }
         guard event.momentumPhase.isEmpty else { return true }
+        // Volume follows physical input direction, independent of Natural Scrolling.
+        let verticalDelta = event.isDirectionInvertedFromDevice ? -event.scrollingDeltaY : event.scrollingDeltaY
         let delta: Float
         if event.hasPreciseScrollingDeltas {
-            delta = Float(event.scrollingDeltaY) * 0.003
+            delta = Float(verticalDelta) * 0.003
         } else {
-            delta = event.scrollingDeltaY > 0 ? 0.04 : -0.04
+            delta = verticalDelta > 0 ? 0.04 : -0.04
         }
         let next = min(max(output.value + delta, 0), 1)
         if next != output.value, !output.set(next) { return false }
         reveal?.cancel()
         reveal = nil
-        show(SystemOutputVolume.current()?.value ?? next)
+        let volume = SystemOutputVolume.current()?.value ?? next
+        if event.hasPreciseScrollingDeltas, volume != output.value,
+           Int(volume * 20) != Int(output.value * 20) || volume == 0,
+           UserDefaults.standard.object(forKey: Self.hapticsPreferenceKey) as? Bool ?? true {
+            NSHapticFeedbackManager.defaultPerformer.perform(.generic, performanceTime: .now)
+        }
+        show(volume)
         return true
     }
 

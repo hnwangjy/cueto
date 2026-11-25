@@ -3,15 +3,24 @@ import AppKit
 import Combine
 import Sparkle
 import SwiftUI
+#if DEBUG
+import Darwin
+import OSLog
+#endif
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let excludedApps = ExcludedAudioApps()
     private lazy var playback = PlaybackController(excludedApps: excludedApps)
-    private let subtitles = CosmosSubtitleMonitor()
-    private let appleLyrics = AppleMusicLyricsMonitor()
-    private let cosmosRecovery = CosmosCrashRecoveryMonitor()
-    private var subtitleStatusItem: NSStatusItem?
+    private lazy var subtitles = CosmosSubtitleMonitor()
+    private lazy var appleLyrics = AppleMusicLyricsMonitor()
+    private lazy var cosmosRecovery = CosmosCrashRecoveryMonitor()
+#if DEBUG
+    // Keep the descriptor open for the process lifetime. macOS releases the
+    // lock on exit, including when Xcode stops the debug session.
+    private var developmentInstanceLock: Int32 = -1
+#endif
+    private var subtitleStatusView: SubtitleStatusView?
     private var subtitleObservations = Set<AnyCancellable>()
     private var lastSubtitleContent: MenuBarSubtitleContent?
     private var lastSubtitleWidth: CGFloat?
@@ -20,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var scheduledSubtitleRefresh: Date?
     private var statusItem: NSStatusItem?
     private var statusControlView: StatusBarControlView?
+    private var statusControlWidth: CGFloat = 0
     private var statusItemObservation: AnyCancellable?
     private lazy var updaterController = SPUStandardUpdaterController(
         startingUpdater: true,
@@ -31,7 +41,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private var notchPanelController: NotchPanelController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+#if DEBUG
+        guard claimDevelopmentInstance() else {
+            NSApplication.shared.terminate(nil)
+            return
+        }
+#endif
         NSApplication.shared.setActivationPolicy(.accessory)
+        _ = cosmosRecovery
         let updater = updaterController.updater
         if updater.automaticallyChecksForUpdates && updater.canCheckForUpdates {
             updater.checkForUpdatesInBackground()
@@ -68,13 +85,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             (button.cell as? NSButtonCell)?.highlightsBy = []
             controlView.routesThroughStatusButton = true
-            controlView.autoresizingMask = [.width, .height]
             controlView.frame = button.bounds
             button.addSubview(controlView)
             button.setAccessibilityLabel(String(localized: "Cueto 播放控制"))
         }
 
         self.statusControlView = controlView
+        self.statusControlWidth = item.length
         self.statusItem = item
         Publishers.Merge3(subtitles.objectWillChange, appleLyrics.objectWillChange, playback.objectWillChange)
             .receive(on: RunLoop.main)
@@ -83,19 +100,66 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         refreshSubtitleItem()
         statusItemObservation = playback.$applicationName
             .combineLatest(playback.$hasActiveSession, playback.$activeAudioSources)
-            .sink { [weak item, weak controlView] name, hasActiveSession, sources in
-                let length = Self.statusItemLength(
+            .sink { [weak self] name, hasActiveSession, sources in
+                guard let self else { return }
+                self.statusControlWidth = Self.statusItemLength(
                     for: name,
                     hasActiveSession: hasActiveSession,
                     sourceCount: sources.count
                 )
-                item?.length = length
-                controlView?.frame.size.width = length
+                self.layoutStatusItem()
             }
     }
 
+#if DEBUG
+    private func claimDevelopmentInstance() -> Bool {
+        guard let identifier = Bundle.main.bundleIdentifier else { return true }
+        let current = NSRunningApplication.current
+        let existing = NSRunningApplication.runningApplications(withBundleIdentifier: identifier).contains { app in
+            guard app.processIdentifier != current.processIdentifier, !app.isTerminated else { return false }
+            if let launchedAt = app.launchDate, let currentLaunch = current.launchDate, launchedAt != currentLaunch {
+                return launchedAt < currentLaunch
+            }
+            return app.processIdentifier < current.processIdentifier
+        }
+        let logger = Logger(subsystem: identifier, category: "Launch")
+        guard !existing else {
+            logger.notice("Duplicate development launch ignored; an older instance is running.")
+            return false
+        }
+
+        let lockPath = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent(identifier + ".instance.lock").path
+        let descriptor = open(lockPath, O_CREAT | O_RDWR | O_CLOEXEC | O_NOFOLLOW, S_IRUSR | S_IWUSR)
+        guard descriptor >= 0 else {
+            logger.error("Could not open the development instance lock: \(errno).")
+            return true
+        }
+        guard flock(descriptor, LOCK_EX | LOCK_NB) == 0 else {
+            let failure = errno
+            close(descriptor)
+            if failure == EWOULDBLOCK {
+                logger.notice("Duplicate development launch ignored; the instance lock is held.")
+                return false
+            }
+            logger.error("Could not acquire the development instance lock: \(failure).")
+            return true
+        }
+        developmentInstanceLock = descriptor
+        return true
+    }
+#endif
+
     @objc private func statusItemActivated(_ sender: NSStatusBarButton) {
-        statusControlView?.handleStatusItemEvent(NSApp.currentEvent)
+        let event = NSApp.currentEvent
+        if event?.type == .leftMouseUp, let subtitle = subtitleStatusView, let window = sender.window {
+            let windowPoint = window.convertPoint(fromScreen: NSEvent.mouseLocation)
+            if subtitle.bounds.contains(subtitle.convert(windowPoint, from: nil)) {
+                subtitle.performClick(nil)
+                return
+            }
+        }
+        statusControlView?.handleStatusItemEvent(event)
     }
 
     private func refreshSubtitleItem() {
@@ -151,25 +215,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         guard content != lastSubtitleContent || width != lastSubtitleWidth else { return }
         lastSubtitleContent = content
         lastSubtitleWidth = width
-        guard let content else {
-            if let item = subtitleStatusItem { NSStatusBar.system.removeStatusItem(item) }
-            subtitleStatusItem = nil
+        guard let content, let button = statusItem?.button else {
+            subtitleStatusView?.removeFromSuperview()
+            subtitleStatusView = nil
+            layoutStatusItem()
             return
         }
-        let item: NSStatusItem
-        if let existing = subtitleStatusItem {
-            item = existing
+        let view: SubtitleStatusView
+        if let existing = subtitleStatusView {
+            view = existing
         } else {
-            item = NSStatusBar.system.statusItem(withLength: width)
-            let view = SubtitleStatusView(frame: NSRect(x: 0, y: 0, width: width, height: NSStatusBar.system.thickness))
+            view = SubtitleStatusView(frame: NSRect(x: 0, y: 0, width: width, height: button.bounds.height))
             view.target = self
             view.action = #selector(openSubtitleSettings)
-            item.view = view
-            subtitleStatusItem = item
+            button.addSubview(view)
+            subtitleStatusView = view
         }
-        item.length = width
-        item.view?.setFrameSize(NSSize(width: width, height: NSStatusBar.system.thickness))
-        (item.view as? SubtitleStatusView)?.show(content)
+        layoutStatusItem()
+        view.show(content)
+    }
+
+    private func layoutStatusItem() {
+        guard let item = statusItem, let button = item.button, let controls = statusControlView else { return }
+        let subtitleWidth = subtitleStatusView == nil ? 0 : lastSubtitleWidth ?? 0
+        let height = button.bounds.height
+        let totalWidth = subtitleWidth + statusControlWidth
+        if item.length != totalWidth { item.length = totalWidth }
+        subtitleStatusView?.setFrameSize(NSSize(width: subtitleWidth, height: height))
+        controls.frame = NSRect(x: subtitleWidth, y: 0, width: statusControlWidth, height: height)
     }
 
     @objc private func openSubtitleSettings() { openCueto() }

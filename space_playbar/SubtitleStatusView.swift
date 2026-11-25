@@ -32,6 +32,9 @@ final class SubtitleStatusView: NSButton {
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     override func draw(_ dirtyRect: NSRect) {}
 
+    // The shared native status button dispatches pointer clicks for both regions.
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
     override func setFrameSize(_ newSize: NSSize) {
         let offset = readingOffset
         let changed = frame.size != newSize
